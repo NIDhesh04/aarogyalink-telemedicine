@@ -1,16 +1,10 @@
 const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema({
-  slotId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Slot"
-  },
-  patientId: String,
-  doctorId: String,
-  status: {
-    type: String,
-    default: "booked"
-  },
+  slotId: { type: mongoose.Schema.Types.ObjectId, ref: "Slot", required: true },
+  patientId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  status: { type: String, enum: ["booked", "completed", "cancelled"], default: "booked" },
   symptomBrief: String,
   prescriptionUrl: String
 }, { timestamps: true });
