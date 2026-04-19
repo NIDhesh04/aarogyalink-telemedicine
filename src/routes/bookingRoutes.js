@@ -3,17 +3,19 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
+const { client } = require('../config/redis');
+
 
 router.post('/', async (req, res) => {
   try {
     const { slotId, patientId } = req.body;
 
     if (!slotId || !mongoose.Types.ObjectId.isValid(slotId)) {
-      return res.status(400).json({ error: 'Invalid slotId. Expected a valid MongoDB ObjectId.' });
+      return res.status(400).json({ error: 'Invalid slotId' });
     }
 
     if (!patientId) {
-      return res.status(400).json({ error: 'Missing patientId in request body.' });
+      return res.status(400).json({ error: 'Missing patientId' });
     }
 
     const slot = await Slot.findOneAndUpdate(
@@ -23,19 +25,60 @@ router.post('/', async (req, res) => {
     );
 
     if (!slot) {
-      return res.status(400).json({ error: 'Slot not found or already booked' });
+      return res.status(400).json({ error: 'Slot already booked' });
     }
 
     const booking = await Booking.create({
       slotId,
       patientId,
       doctorId: slot.doctorId,
-      symptomBrief: "dummy symptoms" // later AI will replace
+      symptomBrief: "dummy"
+    });
+
+    console.log("Adding to queue:", booking._id.toString());
+
+    await client.zAdd(`queue:${slot.doctorId}`, {
+      score: Date.now(),
+      value: booking._id.toString()
     });
 
     res.json({
       message: "Booking successful",
       booking
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/queue/:doctorId', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+
+    res.json(queue);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.get('/position/:doctorId/:bookingId', async (req, res) => {
+  try {
+    const { doctorId, bookingId } = req.params;
+
+    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+
+    const position = queue.findIndex(id => id === bookingId.toString());
+
+    if (position === -1) {
+      return res.status(404).json({ message: "Booking not found in queue" });
+    }
+
+    res.json({
+      patientsAhead: position
     });
 
   } catch (err) {

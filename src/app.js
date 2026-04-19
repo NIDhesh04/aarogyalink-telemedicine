@@ -6,8 +6,11 @@ const app = express();
 const dbconnect = require('./config/db');
 const slotRoutes = require('./routes/slotRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const { connectRedis } = require('./config/redis');
+
 
 dbconnect();    
+connectRedis();
 
 app.use(cors());
 app.use(express.json());
