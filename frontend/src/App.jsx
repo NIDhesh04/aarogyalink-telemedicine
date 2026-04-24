@@ -1,10 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-
+import { useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import PatientDashboard from './pages/Patient/PatientDashboard'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
 import ASHADashboard from './pages/ASHA/ASHADashboard'
 import AdminDashboard from './pages/Admin/AdminDashboard'
+import './App.css'
+
+function ProtectedRoute({ role, children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== role) return <Navigate to="/login" replace />
+  return children
+}
 
 function App() {
   return (
@@ -12,10 +20,10 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/patient" element={<PatientDashboard />} />
-        <Route path="/doctor" element={<DoctorDashboard />} />
-        <Route path="/asha" element={<ASHADashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/patient" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/doctor"  element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
+        <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )
