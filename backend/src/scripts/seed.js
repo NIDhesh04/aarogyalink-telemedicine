@@ -29,16 +29,21 @@ async function seed() {
   const today = new Date().toISOString().split('T')[0]
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
-  await Slot.insertMany([
-    { doctorId: doctor1._id, date: today,    startTime: '10:00', endTime: '10:30', time: '10:00 AM', isBooked: false },
-    { doctorId: doctor1._id, date: today,    startTime: '11:00', endTime: '11:30', time: '11:00 AM', isBooked: false },
-    { doctorId: doctor1._id, date: today,    startTime: '14:00', endTime: '14:30', time: '02:00 PM', isBooked: false },
-    { doctorId: doctor2._id, date: today,    startTime: '10:30', endTime: '11:00', time: '10:30 AM', isBooked: false },
-    { doctorId: doctor2._id, date: today,    startTime: '12:00', endTime: '12:30', time: '12:00 PM', isBooked: false },
-    { doctorId: doctor1._id, date: tomorrow, startTime: '09:00', endTime: '09:30', time: '09:00 AM', isBooked: false },
-    { doctorId: doctor2._id, date: tomorrow, startTime: '03:00', endTime: '03:30', time: '03:00 PM', isBooked: false },
-  ])
-  console.log('Created 7 slots')
+  // Create slots for the next 7 days
+  const slotsToCreate = []
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(Date.now() + i * 86400000).toISOString().split('T')[0]
+    slotsToCreate.push(
+      { doctorId: doctor1._id, date, startTime: '10:00', endTime: '10:30', time: '10:00 AM', isBooked: false },
+      { doctorId: doctor1._id, date, startTime: '11:00', endTime: '11:30', time: '11:00 AM', isBooked: false },
+      { doctorId: doctor1._id, date, startTime: '14:00', endTime: '14:30', time: '02:00 PM', isBooked: false },
+      { doctorId: doctor2._id, date, startTime: '09:00', endTime: '09:30', time: '09:00 AM', isBooked: false },
+      { doctorId: doctor2._id, date, startTime: '10:30', endTime: '11:00', time: '10:30 AM', isBooked: false },
+      { doctorId: doctor2._id, date, startTime: '15:00', endTime: '15:30', time: '03:00 PM', isBooked: false },
+    )
+  }
+  await Slot.insertMany(slotsToCreate)
+  console.log(`Created ${slotsToCreate.length} slots (6 per day × 7 days)`)
 
   console.log('\n✅ Seed complete! Test accounts:')
   console.log('  Patient:  ravi@patient.com   / password123')

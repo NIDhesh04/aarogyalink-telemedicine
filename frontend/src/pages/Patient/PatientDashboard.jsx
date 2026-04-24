@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Navbar from '../../components/Navbar'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
+import { useQueuePosition } from '../../hooks/useQueuePosition'
 import '../dashboard.css'
 
 const STATUS_STYLES = {
@@ -25,6 +26,11 @@ export default function PatientDashboard() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [loadingBook, setLoadingBook] = useState(false)
   const [error, setError] = useState('')
+
+  const queueInfo = useQueuePosition(
+    booked ? bookedData?.booking?.doctorId : null,
+    booked ? bookedData?.booking?._id : null
+  )
 
   // Fetch available slots when date changes
   useEffect(() => {
@@ -159,11 +165,23 @@ export default function PatientDashboard() {
                   <h3 className="success-title">Booking Confirmed!</h3>
                   <p className="success-sub">{selectedSlot?.doctorId?.name ?? 'Doctor'} · {selectedSlot?.time}</p>
                   {bookedData?.booking && (
-                    <p className="success-queue">
-                      You are <strong style={{ color: '#f59e0b' }}>#{bookedData.queuePos ?? '?'}</strong> in queue
-                    </p>
+                    <div className="success-queue" style={{ background: 'rgba(245,158,11,0.1)', padding: 16, borderRadius: 8, marginTop: 12 }}>
+                      <p style={{ margin: 0 }}>
+                        Live Queue Position: <strong style={{ color: '#f59e0b', fontSize: 18 }}>#{queueInfo.connected && queueInfo.position ? queueInfo.position : (bookedData.queuePos ?? '?')}</strong>
+                      </p>
+                      {queueInfo.connected && queueInfo.patientsAhead > 0 && (
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-light)' }}>
+                          {queueInfo.patientsAhead} patient(s) ahead of you.
+                        </p>
+                      )}
+                      {queueInfo.connected && queueInfo.position === 1 && (
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#10b981', fontWeight: 600 }}>
+                          You are next! Please get ready.
+                        </p>
+                      )}
+                    </div>
                   )}
-                  <button className="btn-secondary" onClick={() => { setBooked(false); setSymptom(''); setSelectedSlot(null); setBookedData(null) }}>
+                  <button className="btn-secondary" style={{ marginTop: 20 }} onClick={() => { setBooked(false); setSymptom(''); setSelectedSlot(null); setBookedData(null) }}>
                     Book Another
                   </button>
                 </div>

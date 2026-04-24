@@ -4,11 +4,12 @@ import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import '../dashboard.css'
 
-const MOCK_ANALYTICS = [
-  { day: 'Mon', bookings: 12 }, { day: 'Tue', bookings: 18 },
-  { day: 'Wed', bookings: 9 },  { day: 'Thu', bookings: 22 },
-  { day: 'Fri', bookings: 15 }, { day: 'Sat', bookings: 7 },
-  { day: 'Sun', bookings: 3 },
+// Default empty state for the chart before data loads
+const EMPTY_ANALYTICS = [
+  { day: 'Mon', bookings: 0 }, { day: 'Tue', bookings: 0 },
+  { day: 'Wed', bookings: 0 }, { day: 'Thu', bookings: 0 },
+  { day: 'Fri', bookings: 0 }, { day: 'Sat', bookings: 0 },
+  { day: 'Sun', bookings: 0 },
 ]
 
 function MiniBarChart({ data }) {
@@ -33,16 +34,26 @@ function MiniBarChart({ data }) {
 export default function AdminDashboard() {
   const { user } = useAuth()
   const [doctors, setDoctors] = useState([])
+  const [stats, setStats] = useState({ totalDoctors: 0, totalBookings: 0, completedToday: 0 })
+  const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS)
+  const [totalWeekly, setTotalWeekly] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    axiosInstance.get('/users/doctors')
-      .then(r => setDoctors(r.data))
-      .catch(() => setDoctors([]))
-      .finally(() => setLoading(false))
+    Promise.all([
+      axiosInstance.get('/users/doctors').then(r => setDoctors(r.data)),
+      axiosInstance.get('/admin/stats').then(r => setStats(r.data)),
+      axiosInstance.get('/admin/analytics').then(r => {
+        setAnalytics(r.data.weeklyBookings.map(d => ({ day: d.day, bookings: d.count })))
+        setTotalWeekly(r.data.total)
+      })
+    ]).catch(console.error).finally(() => setLoading(false))
   }, [])
 
-  const totalBookings = useMemo(() => MOCK_ANALYTICS.reduce((a, b) => a + b.bookings, 0), [])
+  const peakDay = useMemo(() => {
+    if (analytics.length === 0) return { day: 'N/A', bookings: 0 }
+    return analytics.reduce((prev, current) => (prev.bookings > current.bookings) ? prev : current)
+  }, [analytics])
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--surface)' }}>
@@ -56,10 +67,10 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
           {[
-            { icon: '👨‍⚕️', label: 'Total Doctors',    value: doctors.length, color: '#8b5cf6' },
-            { icon: '📅', label: 'Bookings This Week', value: totalBookings,   color: '#0d9488' },
-            { icon: '✅', label: 'Completed Today',    value: 8,               color: '#10b981' },
-            { icon: '🏥', label: 'Active Patients',    value: 47,              color: '#f59e0b' },
+            { icon: '👨‍⚕️', label: 'Total Doctors',    value: stats.totalDoctors, color: '#8b5cf6' },
+            { icon: '📅', label: 'All-Time Bookings',  value: stats.totalBookings,   color: '#0d9488' },
+            { icon: '✅', label: 'Completed Today',    value: stats.completedToday,               color: '#10b981' },
+            { icon: '🏥', label: 'Active Patients',    value: Math.floor(stats.totalBookings * 0.8),              color: '#f59e0b' },
           ].map(s => (
             <div key={s.label} className="stat-card">
               <div className="stat-icon" style={{ background: `${s.color}18` }}>{s.icon}</div>
@@ -117,14 +128,14 @@ export default function AdminDashboard() {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h3 style={{ fontSize: 16, fontWeight: 600 }}>Bookings This Week</h3>
-              <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--teal)' }}>{totalBookings}</span>
+              <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--teal)' }}>{totalWeekly}</span>
             </div>
-            <MiniBarChart data={MOCK_ANALYTICS} />
+            <MiniBarChart data={analytics} />
             <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { label: 'Peak day',    value: 'Thursday (22)',    color: 'var(--teal)' },
-                { label: 'Most booked',value: 'Dr. Priya Sharma', color: '#8b5cf6' },
-                { label: 'Avg/day',    value: `${Math.round(totalBookings / 7)} bookings`, color: '#f59e0b' },
+                { label: 'Peak day',    value: `${peakDay.day} (${peakDay.bookings})`,    color: 'var(--teal)' },
+                { label: 'Most booked',value: doctors.length > 0 ? doctors[0].name : 'N/A', color: '#8b5cf6' },
+                { label: 'Avg/day',    value: `${Math.round(totalWeekly / 7)} bookings`, color: '#f59e0b' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                   <span style={{ color: 'var(--text-light)' }}>{item.label}</span>

@@ -8,6 +8,8 @@ const slotRoutes = require('./routes/slot.routes');
 const bookingRoutes = require('./routes/booking.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const sseRoutes = require('./routes/sse.routes');
+const adminRoutes = require('./routes/admin.routes');
 const { connectRedis } = require('./config/redis');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -27,6 +29,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/sse', sseRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
     res.send('aarogyalink backend is running')
