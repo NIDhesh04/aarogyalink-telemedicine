@@ -3,11 +3,9 @@
   "version": "1.0.0",
   "description": "A rural telemedicine scheduling platform where patients book  video consultations with doctors. ASHAs can book on behalf  of patients. Features slot booking with race condition  handling, PDF prescription generation, and real-time queue  status via SSE.",
   "main": "index.js",
+  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
-    "backend": "cd backend && npm run dev",
-    "frontend": "cd frontend && npm run dev"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
@@ -20,8 +18,5 @@
   "bugs": {
     "url": "https://github.com/Suhaniagarwal5/aarogyalink-telemedicine/issues"
   },
-  "homepage": "https://github.com/Suhaniagarwal5/aarogyalink-telemedicine#readme",
-  "devDependencies": {
-    "concurrently": "^9.2.1"
-  }
+  "homepage": "https://github.com/Suhaniagarwal5/aarogyalink-telemedicine#readme"
 }
