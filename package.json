@@ -3,9 +3,19 @@
   "version": "1.0.0",
   "description": "A rural telemedicine scheduling platform where patients book  video consultations with doctors. ASHAs can book on behalf  of patients. Features slot booking with race condition  handling, PDF prescription generation, and real-time queue  status via SSE.",
   "main": "index.js",
-  "main": "index.js",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "backend": "npm run dev -w backend",
+    "frontend": "npm run dev -w frontend",
+    "postinstall": "node -e \"if (process.platform === 'darwin' && process.arch === 'arm64') { const fs = require('fs'); const path = require('path'); const target = path.join('node_modules', '@rolldown', 'binding-darwin-arm64'); if (!fs.existsSync(target)) { console.log('Apple Silicon detected. Auto-fixing native bindings...'); const exec = require('child_process').execSync; exec('curl -o b.tgz https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.0.0-rc.16.tgz && mkdir -p ' + target + ' && tar -xzf b.tgz && cp -R package/* ' + target + '/ && rm -rf package b.tgz'); console.log('Native bindings fixed successfully.'); } }\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   },
   "repository": {
     "type": "git",

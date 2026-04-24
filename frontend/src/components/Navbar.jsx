@@ -1,38 +1,15 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import './Navbar.css'
 
-const NAV_ITEMS = {
-  patient: [
-    { label: 'Dashboard', path: '/patient' },
-  ],
-  doctor: [
-    { label: 'Dashboard', path: '/doctor' },
-  ],
-  asha: [
-    { label: 'Dashboard', path: '/asha' },
-  ],
-  admin: [
-    { label: 'Dashboard', path: '/admin' },
-  ],
-}
-
-const ROLE_COLORS = {
-  patient: '#0d9488',
-  doctor:  '#8b5cf6',
-  asha:    '#f59e0b',
-  admin:   '#ef4444',
-}
-
-const ROLE_ICONS = {
-  patient: '🧑‍⚕️',
-  doctor:  '👨‍⚕️',
-  asha:    '👩‍🦺',
-  admin:   '⚙️',
-}
+const ROLE_COLORS = { patient: '#0d9488', doctor: '#8b5cf6', asha: '#f59e0b', admin: '#ef4444' }
+const ROLE_ICONS  = { patient: '🧑‍⚕️', doctor: '👨‍⚕️', asha: '👩‍🦺', admin: '⚙️' }
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   if (!user) return null
 
@@ -44,61 +21,45 @@ export default function Navbar() {
   }
 
   return (
-    <nav style={{
-      background: 'var(--navy)',
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 32px',
-      height: '64px',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
-    }}>
+    <nav className="navbar">
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: `linear-gradient(135deg, var(--teal), var(--sky))`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18,
-        }}>🏥</div>
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '-0.3px' }}>
-          AarogyaLink
-        </span>
+      <div className="navbar-logo">
+        <div className="navbar-logo-icon">🏥</div>
+        <span className="navbar-logo-text">AarogyaLink</span>
       </div>
 
-      {/* User info + logout */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          background: 'rgba(255,255,255,0.06)',
-          padding: '6px 14px', borderRadius: 40,
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          <span style={{ fontSize: 18 }}>{ROLE_ICONS[user.role]}</span>
+      {/* Desktop: User info + Logout */}
+      <div className="navbar-right">
+        <div className="navbar-user" style={{ '--role-color': color }}>
+          <span className="navbar-user-icon">{ROLE_ICONS[user.role]}</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'white', lineHeight: 1.2 }}>{user.name}</div>
-            <div style={{ fontSize: 11, color: color, textTransform: 'capitalize', fontWeight: 500 }}>{user.role}</div>
+            <div className="navbar-user-name">{user.name}</div>
+            <div className="navbar-user-role">{user.role}</div>
           </div>
         </div>
-        <button onClick={handleLogout} style={{
-          background: 'rgba(255,255,255,0.08)',
-          color: 'rgba(255,255,255,0.7)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 8, padding: '7px 16px',
-          fontSize: 13, fontWeight: 500,
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-        }}
-          onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.15)'}
-          onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.08)'}
-        >
-          Logout
-        </button>
+        <button className="navbar-logout" onClick={handleLogout}>Logout</button>
       </div>
+
+      {/* Mobile: hamburger */}
+      <button className="navbar-hamburger" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="navbar-mobile-menu">
+          <div className="navbar-user" style={{ '--role-color': color, padding: '8px 0' }}>
+            <span>{ROLE_ICONS[user.role]}</span>
+            <div>
+              <div className="navbar-user-name">{user.name}</div>
+              <div className="navbar-user-role">{user.role}</div>
+            </div>
+          </div>
+          <button className="navbar-logout" onClick={handleLogout} style={{ width: '100%', textAlign: 'center' }}>
+            Logout
+          </button>
+        </div>
+      )}
     </nav>
   )
 }
