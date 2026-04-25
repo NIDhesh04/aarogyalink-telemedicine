@@ -6,7 +6,9 @@ const bookingSchema = new mongoose.Schema({
   doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   status: { type: String, enum: ["booked", "completed", "cancelled"], default: "booked" },
   symptomBrief: String,
+  prescription: String,
   prescriptionUrl: String
 }, { timestamps: true });
+
 
 module.exports = mongoose.model("Booking", bookingSchema);

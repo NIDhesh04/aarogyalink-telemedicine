@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Slot = require('../models/Slot');
+const { client } = require('../config/redis');
+
 
 // Create a slot (doctor/admin use)
 router.post('/', async (req, res) => {
@@ -16,15 +18,31 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { doctorId, date } = req.query;
+    const cacheKey = `slots:${doctorId || 'all'}:${date || 'any'}`;
+
+    // 1. Check Redis Cache
+    const cachedSlots = await client.get(cacheKey);
+    if (cachedSlots) {
+      console.log('Serving slots from Redis cache');
+      return res.json(JSON.parse(cachedSlots));
+    }
+
     const filter = { isBooked: false };
     if (doctorId) filter.doctorId = doctorId;
     if (date) filter.date = date;
+    
+    // 2. Fetch from DB
     const slots = await Slot.find(filter).populate('doctorId', 'name specialty');
+    
+    // 3. Save to Redis (expire in 5 minutes)
+    await client.set(cacheKey, JSON.stringify(slots), { EX: 300 });
+    
     res.json(slots);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Get all slots for a doctor (their schedule)
 router.get('/doctor/:doctorId', async (req, res) => {

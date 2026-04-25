@@ -277,9 +277,25 @@ export default function DoctorDashboard() {
                       Save Prescription
                     </button>
                   )}
-                  <button className="btn-book" style={{ flex: 1 }}>
-                    Generate PDF
+                  <button 
+                    onClick={async () => {
+                      if (!prescription.trim()) return;
+                      try {
+                        const bookingId = selected.bookingId || selected._id; // Adjust based on data structure
+                        await axiosInstance.post(`/bookings/complete/${bookingId}`, { prescription });
+                        setSaved(p => ({ ...p, [selected._id]: prescription }));
+                        alert('Prescription saved and PDF generation queued!');
+                      } catch (err) {
+                        alert('Failed to save prescription');
+                      }
+                    }}
+                    className="btn-book" 
+                    style={{ flex: 1 }}
+                    disabled={!prescription.trim() && !saved[selected._id]}
+                  >
+                    Complete &amp; Generate PDF
                   </button>
+
                 </div>
               </>
             )}
