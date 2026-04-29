@@ -4,10 +4,15 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:e2e": "jest tests/e2e.test.js --forceExit --detectOpenHandles",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/scripts/seed.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000
   },
   "keywords": [],
   "author": "",
