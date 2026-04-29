@@ -1,174 +1,22 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const router = express.Router();
-const Slot = require('../models/Slot');
-const Booking = require('../models/Booking');
-const AuditLog = require('../models/AuditLog');
-const { client } = require('../config/redis');
-const { generateClinicalBrief } = require('../services/ai/triage.service');
-const queueSSEManager = require('../services/sse/queue.sse');
-const { addPDFJob } = require('../services/queue/pdf.queue');
-const { sendBookingConfirmation } = require('../services/mail/mail.service');
-const { scheduleReminder } = require('../services/mail/reminder.service');
-const User = require('../models/User'); // Need User model to get patient email
-
-
-
-
-
+const {
+  createBooking,
+  getDoctorQueue,
+  getPatientQueuePosition,
+  completeBooking,
+} = require('../controllers/booking.controller');
 
 // ─── POST /api/bookings ───────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
-  try {
-    const { slotId, patientId, symptomBrief } = req.body;
-    if (!slotId || !mongoose.Types.ObjectId.isValid(slotId))
-      return res.status(400).json({ error: 'Invalid slotId' });
-    if (!patientId)
-      return res.status(400).json({ error: 'Missing patientId' });
-
-    // Atomic: mark slot as booked only if it's still available (race-condition safe)
-    const slot = await Slot.findOneAndUpdate(
-      { _id: slotId, isBooked: false },
-      { isBooked: true, bookedBy: patientId },
-      { new: true }
-    );
-    if (!slot) return res.status(400).json({ error: 'Slot already booked or not found' });
-
-    // AI Triage: if patient provided raw symptoms, generate a clinical brief
-    let finalBrief = symptomBrief || '';
-    if (req.body.rawSymptoms && !symptomBrief) {
-      finalBrief = await generateClinicalBrief(req.body.rawSymptoms);
-    }
-
-    const booking = await Booking.create({
-      slotId, patientId, doctorId: slot.doctorId,
-      symptomBrief: finalBrief,
-    });
-
-    // Invalidate slot availability cache
-    await client.del(`slots:all:${slot.date}`);
-    await client.del(`slots:${slot.doctorId}:${slot.date}`);
-    await client.del(`slots:all:any`);
-    await client.del(`slots:${slot.doctorId}:any`);
-
-
-
-    // Add to Redis sorted queue (score = timestamp for FIFO order)
-    await client.zAdd(`queue:${slot.doctorId}`, {
-      score: Date.now(),
-      value: booking._id.toString(),
-    });
-
-    // Trigger SSE update for all clients watching this doctor's queue
-    queueSSEManager.broadcastQueueUpdate(slot.doctorId);
-
-
-    // Get queue position immediately
-    const queue = await client.zRange(`queue:${slot.doctorId}`, 0, -1);
-    const position = queue.findIndex(id => id === booking._id.toString()) + 1;
-
-    // Write audit log
-    await AuditLog.create({
-      action: 'booking_created',
-      performedBy: patientId,
-      targetId: booking._id,
-      metadata: { doctorId: slot.doctorId, slotId, position },
-    });
-
-    // Send Email Confirmation (Async)
-    const patient = await User.findById(patientId);
-    if (patient && patient.email) {
-      sendBookingConfirmation(patient.email, {
-        patientName: patient.name,
-        doctorName: slot.doctorId.name || 'Your Doctor',
-        date: slot.date,
-        time: slot.time
-      });
-    }
-
-    // Schedule 1-hour Reminder
-    try {
-      const slotDateTime = new Date(`${slot.date}T${slot.startTime}:00`);
-      const reminderTime = new Date(slotDateTime.getTime() - 60 * 60 * 1000); // 1 hour before
-      const delay = reminderTime.getTime() - Date.now();
-      
-      if (delay > 0 && patient && patient.email) {
-        await scheduleReminder(patient.email, {
-          patientName: patient.name,
-          doctorName: slot.doctorId.name || 'Your Doctor',
-          date: slot.date,
-          time: slot.time
-        }, delay);
-      }
-    } catch (err) {
-      console.error('Reminder scheduling failed:', err);
-    }
-
-    res.status(201).json({ message: 'Booking successful', booking, queuePos: position });
-
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.post('/', createBooking);
 
 // ─── GET /api/bookings/queue/:doctorId ────────────────────────────────────────
-router.get('/queue/:doctorId', async (req, res) => {
-  try {
-    const queue = await client.zRange(`queue:${req.params.doctorId}`, 0, -1);
-    res.json({ queue, total: queue.length });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.get('/queue/:doctorId', getDoctorQueue);
 
 // ─── GET /api/bookings/position/:doctorId/:bookingId ─────────────────────────
-router.get('/position/:doctorId/:bookingId', async (req, res) => {
-  try {
-    const { doctorId, bookingId } = req.params;
-    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
-    const index = queue.findIndex(id => id === bookingId);
-    if (index === -1) return res.status(404).json({ message: 'Not found in queue' });
-    res.json({ position: index + 1, patientsAhead: index, total: queue.length });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.get('/position/:doctorId/:bookingId', getPatientQueuePosition);
 
 // ─── POST /api/bookings/complete/:bookingId ──────────────────────────────────
-router.post('/complete/:bookingId', async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-    const { prescription } = req.body;
-
-    const booking = await Booking.findById(bookingId).populate('patientId doctorId');
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
-
-    // Update booking status
-    booking.status = 'completed';
-    booking.prescription = prescription;
-    await booking.save();
-
-    // Remove from Redis queue
-    await client.zRem(`queue:${booking.doctorId._id}`, booking._id.toString());
-
-    // Trigger SSE updates
-    queueSSEManager.sendDone(bookingId);
-    queueSSEManager.broadcastQueueUpdate(booking.doctorId._id);
-
-    // Queue background PDF generation
-    await addPDFJob({
-      bookingId: booking._id,
-      patientName: booking.patientId.name,
-      doctorName: booking.doctorId.name,
-      symptomBrief: booking.symptomBrief,
-      prescription: prescription
-    });
-
-    res.json({ message: 'Booking completed and PDF generation queued', booking });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.post('/complete/:bookingId', completeBooking);
 
 module.exports = router;
