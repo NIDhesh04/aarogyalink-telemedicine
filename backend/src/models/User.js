@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   },
   specialty: { type: String }, // For doctors
   phone: { type: String },
+  profilePhoto: { type: String, default: null }, // Relative path to profile photo
   createdAt: { type: Date, default: Date.now }
 });
 
