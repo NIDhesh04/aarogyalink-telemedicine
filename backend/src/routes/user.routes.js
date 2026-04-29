@@ -1,13 +1,16 @@
 const express = require('express');
 const User = require('../models/User');
+const Doctor = require('../models/Doctor');
 const { upload } = require('../middleware/upload');
 const { uploadDoctorPhoto } = require('../controllers/user.controller');
 const router = express.Router();
 
-// Get all doctors
+// Get all doctors (join User + Doctor for specialty & photo)
 router.get('/doctors', async (req, res) => {
   try {
-    const doctors = await User.find({ role: 'doctor' }).select('name email specialty profilePhoto');
+    const doctors = await Doctor.find()
+      .populate('userId', 'name email phone')
+      .select('userId specialty availableDays profilePhoto');
     res.json(doctors);
   } catch (err) {
     res.status(500).json({ error: err.message });

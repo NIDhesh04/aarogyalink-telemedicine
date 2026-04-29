@@ -10,5 +10,8 @@ const bookingSchema = new mongoose.Schema({
   prescriptionUrl: String
 }, { timestamps: true });
 
+// Compound indexes for query performance
+bookingSchema.index({ patientId: 1, createdAt: -1 }); // Patient booking history
+bookingSchema.index({ doctorId: 1, status: 1 });       // Doctor's pending consultation list
 
 module.exports = mongoose.model("Booking", bookingSchema);

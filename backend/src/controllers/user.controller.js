@@ -1,9 +1,10 @@
 const User = require('../models/User');
+const Doctor = require('../models/Doctor');
 
 /**
  * Upload doctor profile photo.
  * Expects multer to have already processed the file onto req.file.
- * Updates the user document with the relative profilePhoto path.
+ * Updates the Doctor document with the relative profilePhoto path.
  *
  * POST /api/users/doctor/:id/photo
  */
@@ -26,8 +27,13 @@ const uploadDoctorPhoto = async (req, res) => {
 
     // Store relative path for portability (served via express.static)
     const profilePhoto = `/uploads/profiles/${req.file.filename}`;
-    user.profilePhoto = profilePhoto;
-    await user.save();
+
+    // Upsert the Doctor document with the new photo
+    await Doctor.findOneAndUpdate(
+      { userId: id },
+      { profilePhoto },
+      { upsert: true, new: true }
+    );
 
     res.json({
       message: 'Profile photo uploaded successfully',

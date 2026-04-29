@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Doctor = require('../models/Doctor');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aarogyalink_secret_key_123';
@@ -12,7 +13,12 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
-    const user = await User.create({ name, email, password, role, specialty });
+    const user = await User.create({ name, email, password, role });
+
+    // If registering as a doctor, create the Doctor profile
+    if (role === 'doctor') {
+      await Doctor.create({ userId: user._id, specialty: specialty || 'General Medicine' });
+    }
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
