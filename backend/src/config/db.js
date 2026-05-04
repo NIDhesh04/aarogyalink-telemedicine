@@ -1,14 +1,15 @@
 const mongoose = require('mongoose');
 
-const dbconnect = async()=>{
-    try{
+// Rename to connectDB to match your server.js
+const connectDB = async () => {
+    try {
         await mongoose.connect(process.env.MONGO_URI);
-        console.log('database connected');
-    }
-    catch(error){
-        console.log(error);
+        console.log('✅ Database connected');
+    } catch (error) {
+        console.error('❌ MongoDB Connection Error:', error.message);
         process.exit(1);    
     }
-}
+};
 
-module.exports = dbconnect;
+// Export as an object so { connectDB } works in server.js
+module.exports = { connectDB };
