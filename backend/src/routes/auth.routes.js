@@ -1,49 +1,101 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
+const router = express.Router();
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
-const router = express.Router();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'aarogyalink_secret_key_123';
 
 // Register
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, specialty } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required.' });
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name, email, password and role are required.' 
+      });
     }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'User with this email already exists.' 
+      });
+    }
+
     const user = await User.create({ name, email, password, role });
 
-    // If registering as a doctor, create the Doctor profile
     if (role === 'doctor') {
-      await Doctor.create({ userId: user._id, specialty: specialty || 'General Medicine' });
+      await Doctor.create({ 
+        userId: user._id, 
+        specialty: specialty || 'General Medicine' 
+      });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+
+    const token = user.generateAuthToken();
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+
   } catch (err) {
-    if (err.code === 11000) {
-      return res.status(400).json({ error: 'An account with this email already exists. Please login instead.' });
-    }
-    res.status(400).json({ error: err.message });
+    console.error("Register Error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during registration',
+      error: err.message 
+    });
   }
 });
 
-// Login
+// Login (same as before)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and password are required.' 
+      });
     }
+
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ error: 'Invalid email or password. Please try again.' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid email or password.' 
+      });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+
+    const token = user.generateAuthToken();
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+
   } catch (err) {
-    res.status(500).json({ error: 'Server error. Please try again.' });
+    console.error("Login Error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during login' 
+    });
   }
 });
 

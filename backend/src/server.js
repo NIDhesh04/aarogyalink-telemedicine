@@ -1,13 +1,13 @@
-// Tune UV_THREADPOOL_SIZE for performance (default is 4, increasing to 16 for heavy I/O/worker load)
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || 16;
 
 const app = require('./app');
 
-require('./workers/pdf.worker'); // Start the PDF worker
+// Temporarily disable PDF worker (needs Redis)
+ // require('./workers/pdf.worker');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📍 Redis is disabled for development`);
 });
-
