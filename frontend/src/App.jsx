@@ -5,7 +5,6 @@ import PatientDashboard from './pages/Patient/PatientDashboard'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
 import ASHADashboard from './pages/ASHA/ASHADashboard'
 import AdminDashboard from './pages/Admin/AdminDashboard'
-import './App.css'
 
 function ProtectedRoute({ role, children }) {
   const { user } = useAuth()
