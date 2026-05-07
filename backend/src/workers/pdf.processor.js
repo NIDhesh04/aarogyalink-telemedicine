@@ -1,17 +1,15 @@
-const { generatePrescriptionPDF } = require('../services/pdf/prescription.service');
-
 /**
- * Sandboxed worker processor for BullMQ.
- * This runs in a separate process/thread.
+ * pdf.processor.js — DEPRECATED
+ *
+ * This file was the original BullMQ sandboxed processor.
+ * It has been replaced by pdf.thread.js which uses the native
+ * Node.js worker_threads API (required by the teacher checklist).
+ *
+ * The new architecture:
+ *   pdf.worker.js   → BullMQ consumer, spawns native threads
+ *   pdf.thread.js   → runs pdfkit inside worker_threads.Worker
+ *
+ * This file is kept only as a reference and is no longer imported.
  */
-module.exports = async (job) => {
-  console.log(`[Worker Thread] Processing PDF for booking: ${job.data.bookingId}`);
-  
-  try {
-    const filePath = await generatePrescriptionPDF(job.data);
-    return { filePath };
-  } catch (error) {
-    console.error(`[Worker Thread] PDF generation failed:`, error);
-    throw error;
-  }
-};
+
+// No longer used — see pdf.thread.js

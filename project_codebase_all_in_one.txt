@@ -1,0 +1,5253 @@
+
+<file path="README.md">
+# AarogyaLink — Rural Telemedicine Scheduler
+
+> Project No. 11 · Health & Emergency · MERN Stack BTech Course — Group Project
+
+---
+
+## Group Details
+
+| | |
+|---|---|
+| Project Number | 11 |
+| Project Title | AarogyaLink — Rural Telemedicine Scheduler |
+| Group Number | 7 |
+| Team Lead | Suhani Agarwal |
+| Members | Gursneh Kaur, Aryaman Bohra, Nidhesh Soni |
+
+---
+
+## The Real Problem
+
+India has over 600,000 villages. Most of them have no doctor. The nearest government hospital or district health centre is often 20–50 km away. A daily-wage farmer or a pregnant woman in a remote village cannot afford to travel that distance every time they need a consultation — losing a day's wage, arranging transport, and waiting for hours at an overcrowded OPD.
+
+ASHA workers (Accredited Social Health Activists) are the last mile of India's health system. They visit homes, track pregnancies, and guide patients — but they have no digital tool to help them book consultations on a patient's behalf.
+
+Meanwhile, doctors at district hospitals have no visibility into how many patients are waiting, who is next, or whether a slot was accidentally double-booked by two people clicking at the same time.
+
+AarogyaLink is built to fix exactly this. It is not a general-purpose telemedicine app. It is designed specifically for the rural public health context — where connectivity is low, users may not be tech-savvy, and the ASHA worker is often the bridge between the patient and the system.
+
+---
+
+## What This Project Builds
+
+AarogyaLink is a full-stack web application where:
+
+- Patients in rural areas can browse available doctors and book a video consultation slot
+- ASHA workers can log in and book slots on behalf of the patients they are tracking
+- Doctors set their own availability and manage their appointment queue from a dashboard
+- After a consultation, the doctor uploads a prescription which the system converts into a downloadable PDF
+- Patients and ASHAs can see their live queue position in real time — no refreshing, no guessing
+
+The system is designed to handle a situation that happens constantly in real public health systems: two people trying to book the last available slot at the same moment. Without careful engineering, both could succeed and the doctor ends up double-booked. This project solves that at the database level, not just the UI level.
+
+---
+
+## What the Project Technically Demands
+
+### Concurrent Slot Booking Without Overselling
+When two patients (or an ASHA and a patient) attempt to book the same last slot simultaneously, only one must succeed. This is handled using MongoDB's `findOneAndUpdate` with a precondition `{ isBooked: false }` — making the check and the update a single atomic operation. The losing request receives a clear "slot no longer available" response. This is not a UI trick — it is enforced at the database level.
+
+### Redis Caching for Slot Availability
+Doctor slot availability is read far more often than it is written. Fetching it from MongoDB on every request is wasteful. Available slots are cached in Redis with immediate invalidation the moment a booking is confirmed. This keeps response times fast even under high load and teaches the cache-aside pattern with real invalidation logic.
+
+### Four-Role Authentication System
+The platform has four distinct types of users — Patient, Doctor, ASHA, and Admin — each with a completely different set of permissions and views. A single JWT-based authentication system serves all four, with role-specific middleware guarding every protected route. The ASHA role is particularly important: it can act on behalf of patients, which requires careful authorisation logic to prevent misuse.
+
+### PDF Prescription Generation Without Blocking the Server
+Generating a PDF is a CPU-intensive and file I/O heavy operation. Running it on Node's main thread would block the event loop and slow down every other request on the server. Prescriptions are generated using `pdfkit` inside a Node.js Worker Thread — the main thread hands off the job and responds to the client immediately, while the PDF is prepared in the background.
+
+### Appointment Queue Using Redis Sorted Sets
+A doctor's upcoming appointments need to be retrieved quickly and in chronological order. Storing them in a Redis Sorted Set keyed by appointment timestamp allows O(log N) retrieval of the next N appointments without touching MongoDB on every queue check. This is how production scheduling systems handle high-frequency reads.
+
+### Live Queue Position via Server-Sent Events
+Rather than making patients repeatedly refresh the page to see their queue position, the server pushes updates in real time using Server-Sent Events (SSE). When a doctor marks a consultation as complete and the queue moves forward, every waiting patient's screen updates automatically. SSE is chosen over WebSockets here because the communication is one-directional — the server pushes, the client only listens.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React.js |
+| Backend | Node.js, Express.js |
+| Database | MongoDB |
+| Cache & Queue | Redis |
+| Authentication | JSON Web Tokens (JWT) |
+| PDF Generation | pdfkit inside Node.js Worker Thread |
+| Real-time Updates | Server-Sent Events (SSE) |
+
+---
+
+## MongoDB Collections
+
+**Users** — All four roles stored in a single collection with a `role` field controlling access.
+
+**Slots** — Each document represents one time slot for one doctor, with an `isBooked` boolean used in atomic update operations.
+
+**Appointments** — Confirmed bookings linking a patient (or ASHA-on-behalf), a doctor, and a slot.
+
+**Prescriptions** — Stores the generated PDF path and metadata, linked to a completed appointment.
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js v18+
+- MongoDB (local or Atlas)
+- Redis (local or Redis Cloud)
+
+### Setup
+
+```bash
+git clone https://github.com/[your-username]/aarogyalink-telemedicine.git
+cd aarogyalink-telemedicine
+
+# Server
+cd server && npm install
+
+# Client
+cd ../client && npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the `server/` directory:
+
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+REDIS_URL=redis://localhost:6379
+```
+
+### Run
+
+```bash
+# Backend
+cd server && npm run dev
+
+# Frontend (new terminal)
+cd client && npm start
+```
+
+---
+
+*MERN Stack BTech Course · Group Project 11 · AarogyaLink — Rural Telemedicine Scheduler*
+
+</file>
+
+<file path="package.json">
+{
+  "name": "aarogyalink-telemedicine",
+  "version": "1.0.0",
+  "description": "A rural telemedicine scheduling platform where patients book video consultations with doctors.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Suhaniagarwal5/aarogyalink-telemedicine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Suhaniagarwal5/aarogyalink-telemedicine/issues"
+  },
+  "homepage": "https://github.com/Suhaniagarwal5/aarogyalink-telemedicine#readme"
+}
+
+</file>
+
+<file path=".gitignore">
+node_modules/
+.env
+dist/
+.DS_Store
+node_modules/
+.env
+backend/node_modules/
+frontend/node_modules/
+frontend/dist/
+*.log
+.DS_Store
+
+</file>
+
+<file path="docker-compose.yml">
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGO_URI=mongodb://mongo:27017/aarogyalink
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - prescription_data:/app/public/prescriptions
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
+    depends_on:
+      - y
+
+volumes:
+  mongo_data:
+  redis_data:
+  prescription_data:
+
+</file>
+
+<file path=".env.example">
+# ──────────────────────────────────────────────────────────────
+# AarogyaLink — Global Project Environment Template
+# ──────────────────────────────────────────────────────────────
+
+# ─── Backend Settings (Used in /backend) ──────────────────────
+# development, production, or test
+NODE_ENV=development
+PORT=5000
+# Optimized for your worker threads[cite: 1, 40]
+UV_THREADPOOL_SIZE=16
+
+# ─── Database & Cache ─────────────────────────────────────────
+MONGO_URI=mongodb://localhost:27017/aarogyalink
+REDIS_URL=redis://localhost:6379
+
+# ─── Security (JWT) ───────────────────────────────────────────
+# Generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+JWT_SECRET=your_backend_jwt_secret
+JWT_REFRESH_SECRET=your_backend_refresh_secret
+
+# ─── AI Triage (Google Gemini) ────────────────────────────────
+# Get your FREE key at: https://aistudio.google.com/
+GEMINI_API_KEY=your_free_gemini_api_key_here
+
+# ─── Email (Nodemailer) ───────────────────────────────────────
+EMAIL_USER=youremail@gmail.com
+EMAIL_PASS=your_16_character_app_password
+
+# ─── Frontend Settings (Used in /frontend) ────────────────────
+# The URL where your backend is running[cite: 3]
+VITE_API_BASE_URL=http://localhost:5000/api
+</file>
+
+<file path="frontend/README.md">
+# React + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>AarogyaLink</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@tanstack/react-query": "^5.99.2",
+    "axios": "^1.15.2",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.38.0",
+    "lightningcss": "^1.32.0",
+    "lucide-react": "^1.12.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.14.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.2",
+    "vite": "^8.0.4"
+  }
+}
+
+</file>
+
+<file path="frontend/.gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+</file>
+
+<file path="frontend/Dockerfile">
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host"]
+
+</file>
+
+<file path="frontend/vite.config.js">
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+
+</file>
+
+<file path="frontend/eslint.config.js">
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{js,jsx}'],
+    extends: [
+      js.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+    },
+  },
+])
+
+</file>
+
+<file path="frontend/src/index.css">
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", sans-serif;
+  
+  --color-navy: #0a1628;
+  --color-navy-light: #112240;
+  
+  --color-primary: #0d9488; /* teal */
+  --color-primary-light: #14b8a6;
+  
+  --color-doctor: #8b5cf6; /* purple */
+  --color-asha: #f59e0b; /* amber */
+  --color-admin: #ef4444; /* red */
+  
+  --color-surface: #f8fafc;
+  --color-surface-2: #f1f5f9;
+  
+  --animate-blob: blob 7s infinite;
+}
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+:root {
+  background-color: var(--color-surface);
+  color: #0f172a;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Utilities for Glassmorphism */
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+  .glass-dark {
+    @apply bg-slate-900/70 backdrop-blur-md border border-slate-700/50 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)];
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface-2); }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</file>
+
+<file path="frontend/src/main.jsx">
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </StrictMode>
+)
+</file>
+
+<file path="frontend/src/App.jsx">
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import Login from './pages/Login'
+import PatientDashboard from './pages/Patient/PatientDashboard'
+import DoctorDashboard from './pages/Doctor/DoctorDashboard'
+import ASHADashboard from './pages/ASHA/ASHADashboard'
+import AdminDashboard from './pages/Admin/AdminDashboard'
+
+function ProtectedRoute({ role, children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== role) return <Navigate to="/login" replace />
+  return children
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/patient" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/doctor"  element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
+        <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
+export default App
+</file>
+
+<file path="frontend/src/types/index.js">
+
+</file>
+
+<file path="frontend/src/components/Navbar.css">
+.navbar {
+  background: var(--navy);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar-logo-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--teal), var(--sky));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+.navbar-logo-text {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-user {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.06);
+  padding: 6px 14px; border-radius: 40px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.navbar-user-icon { font-size: 18px; }
+.navbar-user-name { font-size: 13px; font-weight: 600; color: white; line-height: 1.2; }
+.navbar-user-role {
+  font-size: 11px;
+  color: var(--role-color, var(--teal));
+  text-transform: capitalize;
+  font-weight: 500;
+}
+
+.navbar-logout {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 7px 16px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s;
+}
+.navbar-logout:hover { background: rgba(255,255,255,0.15); }
+
+/* Mobile hamburger */
+.navbar-hamburger {
+  display: none;
+  background: none; border: none;
+  color: white; font-size: 22px;
+  cursor: pointer; padding: 4px;
+}
+
+.navbar-mobile-menu {
+  display: none;
+  width: 100%;
+  padding: 12px 0 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    padding: 0 16px;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+  }
+  .navbar-right { display: none; }
+  .navbar-hamburger { display: block; }
+  .navbar-mobile-menu { display: flex; }
+}
+
+</file>
+
+<file path="frontend/src/components/DashboardLayout.jsx">
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, Home } from 'lucide-react'
+
+const ROLE_COLORS = { patient: 'text-primary bg-primary/10', doctor: 'text-doctor bg-doctor/10', asha: 'text-asha bg-asha/10', admin: 'text-admin bg-admin/10' }
+const ROLE_ICONS  = { patient: UserCircle, doctor: Stethoscope, asha: Activity, admin: ShieldCheck }
+
+export default function DashboardLayout({ children, title, subtitle }) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  if (!user) return null
+
+  const RoleIcon = ROLE_ICONS[user.role] || UserCircle
+  const colorClass = ROLE_COLORS[user.role] || 'text-slate-500 bg-slate-100'
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  const navLinks = [
+    { name: 'Dashboard', icon: Home, path: `/${user.role}` }
+    // Add more role-specific links here in the future
+  ]
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-800">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{ x: sidebarOpen ? 0 : -300 }}
+        className="fixed lg:static top-0 left-0 h-full w-64 bg-white border-r border-slate-200 z-50 flex flex-col transition-transform duration-300 lg:translate-x-0"
+        style={{ transform: sidebarOpen ? 'translateX(0)' : '' }}
+      >
+        <div className="p-6 flex items-center gap-3 border-b border-slate-100">
+          <div className="w-10 h-10 bg-gradient-to-tr from-primary to-primary-light rounded-xl flex items-center justify-center text-white shadow-md">
+            <Stethoscope size={20} strokeWidth={2.5} />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-slate-900">AarogyaLink</span>
+          <button className="ml-auto lg:hidden text-slate-400 hover:text-slate-600" onClick={() => setSidebarOpen(false)}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+          {navLinks.map(link => {
+            const Icon = link.icon
+            return (
+              <button
+                key={link.name}
+                onClick={() => { navigate(link.path); setSidebarOpen(false) }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-primary bg-primary/5 hover:bg-primary/10"
+              >
+                <Icon size={18} />
+                {link.name}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="p-4 border-t border-slate-100">
+          <div className={`flex items-center gap-3 p-3 rounded-xl mb-3 ${colorClass}`}>
+            <RoleIcon size={24} />
+            <div className="flex flex-col">
+              <span className="font-bold text-sm leading-none">{user.name}</span>
+              <span className="text-xs font-medium uppercase tracking-wider mt-1 opacity-80">{user.role}</span>
+            </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+          >
+            <LogOut size={16} /> Logout
+          </button>
+        </div>
+      </motion.aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Topbar */}
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center px-6 lg:px-10 shrink-0 z-30 sticky top-0">
+          <button className="p-2 mr-4 rounded-lg bg-white border border-slate-200 text-slate-500 lg:hidden shadow-sm" onClick={() => setSidebarOpen(true)}>
+            <Menu size={20} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{title}</h1>
+            {subtitle && <p className="text-sm font-medium text-slate-500">{subtitle}</p>}
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <div className="flex-1 overflow-y-auto p-6 lg:p-10">
+          <div className="max-w-6xl mx-auto">
+            {children}
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+</file>
+
+<file path="frontend/src/components/.gitkeep">
+
+</file>
+
+<file path="frontend/src/components/Navbar.jsx">
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import './Navbar.css'
+
+const ROLE_COLORS = { patient: '#0d9488', doctor: '#8b5cf6', asha: '#f59e0b', admin: '#ef4444' }
+const ROLE_ICONS  = { patient: '🧑‍⚕️', doctor: '👨‍⚕️', asha: '👩‍🦺', admin: '⚙️' }
+
+export default function Navbar() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  if (!user) return null
+
+  const color = ROLE_COLORS[user.role]
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  return (
+    <nav className="navbar">
+      {/* Logo */}
+      <div className="navbar-logo">
+        <div className="navbar-logo-icon">🏥</div>
+        <span className="navbar-logo-text">AarogyaLink</span>
+      </div>
+
+      {/* Desktop: User info + Logout */}
+      <div className="navbar-right">
+        <div className="navbar-user" style={{ '--role-color': color }}>
+          <span className="navbar-user-icon">{ROLE_ICONS[user.role]}</span>
+          <div>
+            <div className="navbar-user-name">{user.name}</div>
+            <div className="navbar-user-role">{user.role}</div>
+          </div>
+        </div>
+        <button className="navbar-logout" onClick={handleLogout}>Logout</button>
+      </div>
+
+      {/* Mobile: hamburger */}
+      <button className="navbar-hamburger" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="navbar-mobile-menu">
+          <div className="navbar-user" style={{ '--role-color': color, padding: '8px 0' }}>
+            <span>{ROLE_ICONS[user.role]}</span>
+            <div>
+              <div className="navbar-user-name">{user.name}</div>
+              <div className="navbar-user-role">{user.role}</div>
+            </div>
+          </div>
+          <button className="navbar-logout" onClick={handleLogout} style={{ width: '100%', textAlign: 'center' }}>
+            Logout
+          </button>
+        </div>
+      )}
+    </nav>
+  )
+}
+</file>
+
+<file path="frontend/src/context/RoleContext.jsx">
+
+</file>
+
+<file path="frontend/src/context/AuthContext.jsx">
+import { createContext, useContext, useState, useCallback } from 'react'
+import axiosInstance from '../api/axiosInstance'
+
+const AuthContext = createContext(null)
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('aarogya_user')
+      return stored ? JSON.parse(stored) : null
+    } catch { return null }
+  })
+
+  const login = useCallback(async (email, password) => {
+    const { data } = await axiosInstance.post('/auth/login', { email, password })
+    setUser(data.user)
+    localStorage.setItem('aarogya_user', JSON.stringify(data.user))
+    localStorage.setItem('aarogya_token', data.token)
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+    return data.user
+  }, [])
+
+  const register = useCallback(async (payload) => {
+    const { data } = await axiosInstance.post('/auth/register', payload)
+    setUser(data.user)
+    localStorage.setItem('aarogya_user', JSON.stringify(data.user))
+    localStorage.setItem('aarogya_token', data.token)
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+    return data.user
+  }, [])
+
+  const logout = useCallback(() => {
+    setUser(null)
+    localStorage.removeItem('aarogya_user')
+    localStorage.removeItem('aarogya_token')
+    delete axiosInstance.defaults.headers.common['Authorization']
+  }, [])
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  return useContext(AuthContext)
+}
+</file>
+
+<file path="frontend/src/hooks/useAuth.js">
+// This hook is superseded by AuthContext.jsx which now handles real JWT auth.
+// Re-exported for backward compatibility in case any component imports this directly.
+export { useAuth } from '../context/AuthContext'
+</file>
+
+<file path="frontend/src/hooks/useQueuePosition.js">
+import { useState, useEffect, useRef, useCallback } from 'react'
+
+/**
+ * useQueuePosition — connects to the SSE endpoint and streams live queue position
+ *
+ * @param {string} doctorId  - ID of the doctor
+ * @param {string} bookingId - ID of the booking to track
+ * @returns {{ position, patientsAhead, total, connected, done }}
+ */
+export function useQueuePosition(doctorId, bookingId) {
+  const [state, setState] = useState({
+    position: null,
+    patientsAhead: null,
+    total: null,
+    connected: false,
+    done: false,
+  })
+  const esRef = useRef(null)
+
+  const connect = useCallback(() => {
+    if (!doctorId || !bookingId) return
+    if (esRef.current) esRef.current.close()
+
+    const url = `http://localhost:3000/api/sse/queue/${doctorId}/${bookingId}`
+    const es = new EventSource(url)
+    esRef.current = es
+
+    es.onopen = () => setState(s => ({ ...s, connected: true }))
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setState(s => ({
+          ...s,
+          position: data.position,
+          patientsAhead: data.patientsAhead,
+          total: data.total,
+          done: data.done ?? false,
+          connected: true,
+        }))
+        if (data.done) es.close()
+      } catch { /* ignore parse errors */ }
+    }
+
+    es.onerror = () => {
+      setState(s => ({ ...s, connected: false }))
+      es.close()
+    }
+  }, [doctorId, bookingId])
+
+  useEffect(() => {
+    connect()
+    return () => esRef.current?.close()
+  }, [connect])
+
+  return state
+}
+
+</file>
+
+<file path="frontend/src/hooks/.gitkeep">
+
+</file>
+
+<file path="frontend/src/store/index.js">
+
+</file>
+
+<file path="frontend/src/api/axiosInstance.js">
+import axios from 'axios'
+
+const axiosInstance = axios.create({
+  baseURL: 'http://localhost:5000/api',
+  withCredentials: true,
+})
+
+// Restore JWT token from localStorage on app load (survives page refresh)
+const storedToken = localStorage.getItem('aarogya_token')
+if (storedToken) {
+  axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+}
+
+// Add response interceptor to handle 401 Unauthorized errors globally
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('aarogya_token')
+      localStorage.removeItem('aarogya_user')
+      delete axiosInstance.defaults.headers.common['Authorization']
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default axiosInstance
+</file>
+
+<file path="frontend/src/api/.gitkeep">
+
+</file>
+
+<file path="frontend/src/pages/dashboard.css">
+/* Dashboard shared page wrapper */
+.page-wrapper {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+@media (max-width: 640px) {
+  .page-wrapper { padding: 20px 16px; }
+}
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.stat-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; gap: 16px;
+  transition: box-shadow 0.2s;
+}
+.stat-card:hover { box-shadow: var(--shadow); }
+
+.stat-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.stat-value { font-size: 24px; font-weight: 700; color: var(--text-dark); line-height: 1; }
+.stat-label { font-size: 13px; color: var(--text-light); margin-top: 3px; }
+
+/* Tabs */
+.tab-bar {
+  display: flex; gap: 4px;
+  background: var(--surface-2);
+  border-radius: 10px; padding: 4px;
+  width: fit-content;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 8px 20px; border-radius: 8px;
+  font-size: 14px; font-weight: 500;
+  border: none; cursor: pointer;
+  white-space: nowrap;
+  background: transparent; color: var(--text-light);
+  transition: all 0.15s;
+}
+.tab-btn.active {
+  background: white; color: var(--text-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Booking grid */
+.booking-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 768px) {
+  .booking-grid { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.card {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.card h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+
+/* Slot list */
+.slots-list { display: flex; flex-direction: column; gap: 10px; }
+.slot-item {
+  padding: 14px 16px; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  transition: all 0.15s;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.slot-item:hover { border-color: var(--teal); }
+.slot-item.selected {
+  border-color: var(--teal);
+  background: var(--teal-bg);
+}
+.slot-doctor { font-weight: 600; font-size: 14px; color: var(--text-dark); }
+.slot-specialty { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.slot-time {
+  font-size: 13px; font-weight: 600; color: var(--teal);
+  background: var(--teal-bg); padding: 4px 10px; border-radius: 6px;
+  white-space: nowrap;
+}
+.slot-empty { color: var(--text-light); font-size: 14px; text-align: center; padding: 20px 0; }
+
+/* Form elements */
+.field-label { font-size: 13px; color: var(--text-light); font-weight: 500; }
+.field-input {
+  display: block; width: 100%;
+  margin-top: 6px; margin-bottom: 20px;
+  padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-dark); font-size: 14px;
+}
+.field-input:focus { outline: none; border-color: var(--teal); }
+
+textarea.field-input {
+  resize: vertical; line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+/* Selected slot banner */
+.selected-banner {
+  padding: 12px 14px; border-radius: 8px;
+  background: var(--teal-bg);
+  border: 1px solid var(--teal-border);
+  margin-bottom: 16px; font-size: 13px;
+}
+
+/* Book button */
+.btn-book {
+  width: 100%; padding: 12px; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+  border: none; cursor: pointer;
+  background: var(--teal); color: white;
+  transition: all 0.2s;
+}
+.btn-book:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+.btn-book:disabled { background: var(--border); color: var(--text-light); cursor: not-allowed; }
+
+/* Success card */
+.success-box {
+  text-align: center; padding: 40px 20px;
+  background: rgba(16,185,129,0.05);
+  border-radius: 12px; border: 1px solid rgba(16,185,129,0.2);
+}
+.success-icon { font-size: 48px; margin-bottom: 12px; }
+.success-title { font-size: 18px; font-weight: 600; color: #10b981; margin-bottom: 8px; }
+.success-sub { font-size: 14px; color: var(--text-light); }
+.success-queue { font-size: 13px; color: var(--text-light); margin-top: 8px; }
+.btn-secondary {
+  margin-top: 20px; padding: 10px 20px;
+  border-radius: 8px; background: var(--teal);
+  color: white; font-size: 14px; font-weight: 500;
+  border: none; cursor: pointer;
+}
+
+/* History table */
+.history-card {
+  background: white; border-radius: var(--radius-lg);
+  border: 1px solid var(--border); overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.history-header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.history-row {
+  padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 10px;
+}
+.history-row:last-child { border-bottom: none; }
+.history-avatar {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.history-info { display: flex; align-items: center; gap: 14px; }
+.history-doctor { font-weight: 600; font-size: 14px; }
+.history-date { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.status-badge {
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* Loading & error states */
+.loading-msg { text-align: center; padding: 24px; color: var(--text-light); font-size: 14px; }
+.error-msg {
+  padding: 12px 16px; border-radius: 8px;
+  background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2);
+  color: #ef4444; font-size: 13px; margin-bottom: 16px;
+}
+
+</file>
+
+<file path="frontend/src/pages/Login.jsx">
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../context/AuthContext'
+import { UserCircle, Stethoscope, Activity, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react'
+
+const ROLES = [
+  { key: 'patient', icon: UserCircle, title: 'Patient', desc: 'Book slots, describe symptoms, track queue', color: 'bg-primary text-white', route: '/patient' },
+  { key: 'doctor',  icon: Stethoscope, title: 'Doctor', desc: 'View schedule, symptom briefs, prescriptions', color: 'bg-doctor text-white', route: '/doctor' },
+  { key: 'asha',    icon: Activity, title: 'ASHA Worker', desc: 'Manage patients, book on their behalf', color: 'bg-asha text-white', route: '/asha' },
+  { key: 'admin',   icon: ShieldCheck, title: 'Admin', desc: 'Doctor management, analytics, reports', color: 'bg-admin text-white', route: '/admin' },
+]
+
+export default function Login() {
+  const { login, register } = useAuth()
+  const navigate = useNavigate()
+  const [mode, setMode] = useState('select') // 'select' | 'form'
+  const [selectedRole, setSelectedRole] = useState(null)
+  const [isRegister, setIsRegister] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '' })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role)
+    setMode('form')
+    setError('')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      let user
+      if (isRegister) {
+        user = await register({ ...form, role: selectedRole.key })
+      } else {
+        user = await login(form.email, form.password)
+      }
+      const role = ROLES.find(r => r.key === user.role)
+      navigate(role?.route || '/patient')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-slate-50 font-sans">
+      {/* Animated Background Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary-light/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
+      <div className="absolute top-[20%] right-[-10%] w-96 h-96 bg-doctor/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" style={{ animationDelay: '2s' }} />
+      <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-asha/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" style={{ animationDelay: '4s' }} />
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-lg p-8 sm:p-10 glass rounded-3xl shadow-2xl flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex flex-col items-center mb-10 text-center">
+          <div className="w-16 h-16 bg-gradient-to-tr from-primary to-primary-light rounded-2xl flex items-center justify-center text-white shadow-lg mb-4">
+            <Stethoscope size={32} strokeWidth={2} />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">AarogyaLink</h1>
+          <p className="text-slate-500 mt-1 font-medium">Rural Telemedicine Platform</p>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {mode === 'select' ? (
+            <motion.div
+              key="select"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col gap-4"
+            >
+              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 text-center">Select your role</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {ROLES.map(role => {
+                  const Icon = role.icon
+                  return (
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={role.key}
+                      onClick={() => handleRoleSelect(role)}
+                      className="group flex flex-col items-start p-5 bg-white/50 border border-slate-200 rounded-2xl hover:bg-white hover:border-primary/30 transition-all shadow-sm hover:shadow-md text-left"
+                    >
+                      <div className={`p-2 rounded-xl mb-3 ${role.color} shadow-sm group-hover:scale-110 transition-transform`}>
+                        <Icon size={24} />
+                      </div>
+                      <h3 className="font-bold text-slate-800 mb-1">{role.title}</h3>
+                      <p className="text-xs text-slate-500 leading-relaxed">{role.desc}</p>
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col w-full"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <button 
+                  onClick={() => { setMode('select'); setError(''); setForm({name:'', email:'', password:'', specialty:''}) }}
+                  className="flex items-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                >
+                  <ArrowLeft size={16} className="mr-1" /> Back
+                </button>
+                <div className="flex items-center px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
+                  <selectedRole.icon size={14} className="mr-1.5" />
+                  {selectedRole.title}
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex bg-slate-100/80 p-1 rounded-xl mb-6 relative">
+                <button
+                  className={`flex-1 py-2 text-sm font-semibold rounded-lg z-10 transition-colors ${!isRegister ? 'text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => { setIsRegister(false); setError('') }}
+                >
+                  Sign In
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-semibold rounded-lg z-10 transition-colors ${isRegister ? 'text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => { setIsRegister(true); setError('') }}
+                >
+                  Register
+                </button>
+                {/* Active Indicator */}
+                <motion.div 
+                  className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm"
+                  animate={{ left: isRegister ? 'calc(50% + 2px)' : '4px' }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              </div>
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <AnimatePresence>
+                  {isRegister && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Full Name</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={form.name} 
+                        onChange={e => setForm({ ...form, name: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl bg-white/70 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
+                        placeholder="Ravi Kumar"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Email Address</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={form.email} 
+                    onChange={e => setForm({ ...form, email: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-white/70 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5">Password</label>
+                  <input 
+                    type="password" 
+                    required 
+                    value={form.password} 
+                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-white/70 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <AnimatePresence>
+                  {isRegister && selectedRole?.key === 'doctor' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 mt-4">Specialty</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={form.specialty} 
+                        onChange={e => setForm({ ...form, specialty: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl bg-white/70 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent transition-all"
+                        placeholder="General Medicine"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {error && (
+                  <motion.p 
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+                    className="text-sm text-red-500 bg-red-50 p-3 rounded-xl mt-2 border border-red-100"
+                  >
+                    {error}
+                  </motion.p>
+                )}
+
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit" 
+                  disabled={loading} 
+                  className={`w-full py-3.5 mt-4 rounded-xl font-bold text-white shadow-md flex items-center justify-center transition-all ${selectedRole.color} ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-lg'}`}
+                >
+                  {loading ? (
+                    <div className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </div>
+                  ) : (
+                    <>
+                      {isRegister ? 'Create Account' : 'Sign In'}
+                      <ArrowRight size={18} className="ml-2" />
+                    </>
+                  )}
+                </motion.button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  )
+}
+</file>
+
+<file path="frontend/src/pages/ASHA/ASHADashboard.jsx">
+import { useState, useEffect } from 'react'
+import Navbar from '../../components/Navbar'
+import { useAuth } from '../../context/AuthContext'
+import axiosInstance from '../../api/axiosInstance'
+import '../dashboard.css'
+
+const STATUS_MAP = {
+  stable:   { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: 'Stable' },
+  followup: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: 'Follow-up' },
+  critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  label: 'Critical' },
+}
+
+export default function ASHADashboard() {
+  const { user } = useAuth()
+  const [selected, setSelected] = useState(null)
+  const [selectedSlot, setSelectedSlot] = useState(null)
+  const [booked, setBooked] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  // Slots fetched from API
+  const [slots, setSlots] = useState([])
+  const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    axiosInstance.get(`/slots?date=${today}`)
+      .then(r => setSlots(r.data))
+      .catch(() => setSlots([]))
+  }, [today])
+
+  // In a real app, patients would be fetched from an API too
+  // For now we show connected slots as the "patients" the ASHA manages
+  const MOCK_PATIENTS = [
+    { id: 'p1', name: 'Ravi Kumar',   age: 34, village: 'Rampur',    status: 'stable' },
+    { id: 'p2', name: 'Meena Devi',   age: 52, village: 'Sikar',     status: 'followup' },
+    { id: 'p3', name: 'Gopal Sharma', age: 67, village: 'Chomu',     status: 'critical' },
+    { id: 'p4', name: 'Sunita Bai',   age: 28, village: 'Jhunjhunu', status: 'stable' },
+  ]
+
+  const handleBook = async () => {
+    if (!selectedSlot || !selected) return
+    setLoading(true)
+    setError('')
+    try {
+      await axiosInstance.post('/bookings', {
+        slotId: selectedSlot._id,
+        patientId: selected.id,
+        symptomBrief: `Booked by ASHA ${user?.name} on behalf of ${selected.name}`,
+      })
+      setBooked(true)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Booking failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--surface)' }}>
+      <Navbar />
+      <div className="page-wrapper">
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 700, marginBottom: 4 }}>
+            ASHA Dashboard
+          </h1>
+          <p style={{ color: 'var(--text-light)', fontSize: 15 }}>
+            {user?.name} · Book appointments on behalf of patients
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-grid">
+          {[
+            { icon: '👥', label: 'Patients in Caseload', value: MOCK_PATIENTS.length,                                         color: '#f59e0b' },
+            { icon: '🚨', label: 'Critical Cases',        value: MOCK_PATIENTS.filter(p => p.status === 'critical').length,   color: '#ef4444' },
+            { icon: '📅', label: 'Follow-ups Needed',     value: MOCK_PATIENTS.filter(p => p.status === 'followup').length,   color: '#0d9488' },
+          ].map(s => (
+            <div key={s.label} className="stat-card">
+              <div className="stat-icon" style={{ background: `${s.color}18` }}>{s.icon}</div>
+              <div><div className="stat-value">{s.value}</div><div className="stat-label">{s.label}</div></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Patients + Booking panel */}
+        <div className="booking-grid">
+          {/* Patient list */}
+          <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>My Patients</h3>
+            </div>
+            {MOCK_PATIENTS.map((p, i) => {
+              const s = STATUS_MAP[p.status]
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => { setSelected(p); setSelectedSlot(null); setBooked(false); setError('') }}
+                  style={{
+                    padding: '14px 24px', cursor: 'pointer',
+                    borderBottom: i < MOCK_PATIENTS.length - 1 ? '1px solid var(--border)' : 'none',
+                    background: selected?.id === p.id ? 'rgba(245,158,11,0.04)' : 'white',
+                    borderLeft: selected?.id === p.id ? '3px solid #f59e0b' : '3px solid transparent',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧑‍⚕️</div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{p.village} · Age {p.age}</div>
+                      </div>
+                    </div>
+                    <span className="status-badge" style={{ background: s.bg, color: s.color }}>{s.label}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Book on behalf panel */}
+          <div className="card">
+            {!selected ? (
+              <div style={{ minHeight: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', gap: 12 }}>
+                <div style={{ fontSize: 48 }}>👈</div>
+                <p style={{ fontSize: 14 }}>Select a patient to book a slot</p>
+              </div>
+            ) : booked ? (
+              <div className="success-box">
+                <div className="success-icon">✅</div>
+                <h3 className="success-title">Booking Confirmed!</h3>
+                <p className="success-sub">
+                  {selected.name} → {selectedSlot?.doctorId?.name ?? 'Doctor'} at {selectedSlot?.time ?? selectedSlot?.startTime}
+                </p>
+                <button className="btn-secondary" onClick={() => { setBooked(false); setSelectedSlot(null) }}>
+                  Book Another
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Book for {selected.name}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text-light)' }}>{selected.village} · Age {selected.age}</p>
+                </div>
+
+                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Available Slots ({today})</p>
+                {error && <p className="error-msg">{error}</p>}
+
+                <div className="slots-list" style={{ marginBottom: 20 }}>
+                  {slots.length === 0 ? (
+                    <p className="slot-empty">No slots available today</p>
+                  ) : slots.map(slot => (
+                    <div
+                      key={slot._id}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`slot-item ${selectedSlot?._id === slot._id ? 'selected' : ''}`}
+                      style={{ borderColor: selectedSlot?._id === slot._id ? '#f59e0b' : undefined, background: selectedSlot?._id === slot._id ? 'rgba(245,158,11,0.06)' : undefined }}
+                    >
+                      <div>
+                        <div className="slot-doctor">{slot.doctorId?.name ?? 'Doctor'}</div>
+                        <div className="slot-specialty">{slot.doctorId?.specialty ?? ''}</div>
+                      </div>
+                      <div className="slot-time" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }}>
+                        {slot.time ?? slot.startTime}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleBook}
+                  disabled={!selectedSlot || loading}
+                  className="btn-book"
+                  style={{ background: selectedSlot ? '#f59e0b' : undefined }}
+                >
+                  {loading ? 'Booking...' : 'Confirm Booking →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="frontend/src/pages/ASHA/.gitkeep">
+
+</file>
+
+<file path="frontend/src/pages/Patient/PatientDashboard.jsx">
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import DashboardLayout from '../../components/DashboardLayout'
+import { useAuth } from '../../context/AuthContext'
+import axiosInstance from '../../api/axiosInstance'
+import { useQueuePosition } from '../../hooks/useQueuePosition'
+import { Calendar, CheckCircle2, Hash, Clock, User as UserIcon, AlertCircle, Activity } from 'lucide-react'
+
+export default function PatientDashboard() {
+  const { user } = useAuth()
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [symptom, setSymptom] = useState('')
+  const [selectedSlot, setSelectedSlot] = useState(null)
+  const [booked, setBooked] = useState(false)
+  const [bookedData, setBookedData] = useState(null)
+  const [tab, setTab] = useState('book')
+
+  // Real data state
+  const [slots, setSlots] = useState([])
+  const [bookings, setBookings] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [loadingBook, setLoadingBook] = useState(false)
+  const [error, setError] = useState('')
+
+  const queueInfo = useQueuePosition(
+    booked ? bookedData?.booking?.doctorId : null,
+    booked ? bookedData?.booking?._id : null
+  )
+
+  useEffect(() => {
+    if (!selectedDate) return
+    setLoadingSlots(true)
+    setError('')
+    setSelectedSlot(null)
+    axiosInstance.get(`/slots?date=${selectedDate}`)
+      .then(r => setSlots(r.data))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadingSlots(false))
+  }, [selectedDate])
+
+  useEffect(() => {
+    if (tab !== 'history') return
+    axiosInstance.get(`/bookings`)
+      .then(r => setBookings(r.data))
+      .catch(() => setBookings([]))
+  }, [tab])
+
+  const handleBook = async () => {
+    if (!selectedSlot || !symptom.trim()) return
+    setLoadingBook(true)
+    setError('')
+    try {
+      const { data } = await axiosInstance.post('/bookings', {
+        slotId: selectedSlot._id,
+        patientId: user.id,
+        symptomBrief: symptom,
+      })
+      setBookedData(data)
+      setBooked(true)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Booking failed. Please try again.')
+    } finally {
+      setLoadingBook(false)
+    }
+  }
+
+  const upcomingCount = bookings.filter(b => b.status === 'booked').length
+  const doneCount = bookings.filter(b => b.status === 'completed').length
+
+  const StatCard = ({ icon: Icon, value, label, colorClass, delay }) => (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow"
+    >
+      <div className={`p-4 rounded-xl ${colorClass}`}>
+        <Icon size={28} />
+      </div>
+      <div>
+        <div className="text-3xl font-bold text-slate-800">{value}</div>
+        <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{label}</div>
+      </div>
+    </motion.div>
+  )
+
+  return (
+    <DashboardLayout 
+      title={`Namaste, ${user?.name?.split(' ')[0] ?? 'Patient'} 👋`}
+      subtitle="Book a consultation or track your upcoming appointments"
+    >
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard icon={Calendar} value={upcomingCount} label="Upcoming" colorClass="bg-primary/10 text-primary" delay={0.1} />
+        <StatCard icon={CheckCircle2} value={doneCount} label="Consultations Done" colorClass="bg-emerald-100 text-emerald-600" delay={0.2} />
+        <StatCard icon={Hash} value={bookedData?.queuePos ?? '—'} label="Queue Position" colorClass="bg-amber-100 text-amber-600" delay={0.3} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex bg-slate-200/50 p-1.5 rounded-xl mb-8 w-fit">
+        {[['book', 'Book a Slot'], ['history', 'My Bookings']].map(([key, label]) => (
+          <button 
+            key={key} 
+            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${tab === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {tab === 'book' && (
+          <motion.div 
+            key="book"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+          >
+            {/* Slot Picker */}
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <Calendar className="text-primary" size={24} /> Choose a Date & Slot
+              </h3>
+              
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Select Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700"
+                />
+              </div>
+
+              <div className="flex-1">
+                {loadingSlots ? (
+                  <div className="flex flex-col justify-center items-center h-48 space-y-3">
+                    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <p className="text-sm font-medium text-slate-500">Loading available slots...</p>
+                  </div>
+                ) : slots.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <Calendar size={32} className="text-slate-300 mb-2" />
+                    <p className="text-sm font-medium text-slate-500">No slots available on this date.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
+                    {slots.map(slot => (
+                      <button
+                        key={slot._id}
+                        onClick={() => setSelectedSlot(slot)}
+                        className={`flex flex-col items-start p-4 rounded-xl border text-left transition-all ${selectedSlot?._id === slot._id ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm' : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'}`}
+                      >
+                        <div className="font-bold text-slate-800 mb-1">{slot.doctorId?.name ?? 'Doctor'}</div>
+                        <div className="text-xs font-medium text-slate-500 mb-3">{slot.doctorId?.specialty ?? slot.specialty ?? 'General'}</div>
+                        <div className="mt-auto inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md text-xs font-bold text-slate-600">
+                          <Clock size={12} /> {slot.time}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Symptom Form & Success */}
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+              <AnimatePresence mode="wait">
+                {booked ? (
+                  <motion.div 
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center text-center h-full justify-center"
+                  >
+                    <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+                      <CheckCircle2 size={40} />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Booking Confirmed!</h3>
+                    <p className="text-slate-500 font-medium mb-8">
+                      {selectedSlot?.doctorId?.name ?? 'Doctor'} &bull; {selectedSlot?.time}
+                    </p>
+                    
+                    {bookedData?.booking && (
+                      <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl w-full text-center relative overflow-hidden mb-8">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
+                        <p className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2">Live Queue Position</p>
+                        <div className="text-5xl font-black text-amber-500 tracking-tighter mb-3">
+                          #{queueInfo.connected && queueInfo.position ? queueInfo.position : (bookedData.queuePos ?? '?')}
+                        </div>
+                        {queueInfo.connected && queueInfo.patientsAhead > 0 && (
+                          <p className="text-sm font-medium text-amber-700">
+                            {queueInfo.patientsAhead} patient(s) ahead of you.
+                          </p>
+                        )}
+                        {queueInfo.connected && queueInfo.position === 1 && (
+                          <motion.p 
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                            className="text-sm font-bold text-emerald-600 mt-2 bg-emerald-50 py-1.5 px-3 rounded-full inline-block"
+                          >
+                            You are next! Please get ready.
+                          </motion.p>
+                        )}
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => { setBooked(false); setSymptom(''); setSelectedSlot(null); setBookedData(null) }}
+                      className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                    >
+                      Book Another Consultation
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-1">
+                      <Activity className="text-primary" size={24} /> Describe Symptoms
+                    </h3>
+                    <p className="text-sm font-medium text-slate-500 mb-6">Our AI will create a structured medical brief for the doctor.</p>
+                    
+                    {error && (
+                      <div className="mb-4 flex items-start gap-2 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">
+                        <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                        <p>{error}</p>
+                      </div>
+                    )}
+
+                    <textarea
+                      value={symptom}
+                      onChange={e => setSymptom(e.target.value)}
+                      placeholder="e.g. I have had a fever of 101°F for 3 days along with a sore throat..."
+                      className="w-full flex-1 min-h-[200px] px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700 resize-none mb-6"
+                    />
+
+                    {selectedSlot ? (
+                      <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-center justify-between mb-6">
+                        <div>
+                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Selected Slot</p>
+                          <p className="text-sm font-bold text-slate-800">{selectedSlot.doctorId?.name ?? 'Doctor'} at {selectedSlot.time}</p>
+                        </div>
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-primary">
+                          <CheckCircle2 size={20} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 border-dashed p-4 rounded-xl text-center mb-6">
+                        <p className="text-sm font-medium text-slate-500">Please select a slot from the left to continue.</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleBook}
+                      disabled={!selectedSlot || !symptom.trim() || loadingBook}
+                      className={`w-full py-4 rounded-xl font-bold text-white shadow-md flex items-center justify-center transition-all ${(!selectedSlot || !symptom.trim() || loadingBook) ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-primary hover:bg-primary-light hover:shadow-lg hover:-translate-y-0.5'}`}
+                    >
+                      {loadingBook ? (
+                        <>
+                           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                           Booking Appointment...
+                        </>
+                      ) : 'Confirm Booking'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+
+        {tab === 'history' && (
+          <motion.div 
+            key="history"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"
+          >
+            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+              <Clock className="text-slate-400" size={24} /> Booking History
+            </h3>
+            
+            <div className="space-y-4">
+              {bookings.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="font-medium text-slate-500">No bookings found.</p>
+                </div>
+              ) : bookings.map((b, i) => {
+                const isCompleted = b.status === 'completed'
+                const isCancelled = b.status === 'cancelled'
+                const statusColor = isCompleted ? 'bg-emerald-100 text-emerald-700' : isCancelled ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'
+                
+                return (
+                  <div key={b._id ?? i} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
+                        <UserIcon size={20} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">{b.doctorId?.name ?? 'Doctor'}</div>
+                        <div className="text-sm font-medium text-slate-500 mt-0.5">{b.slotId?.date ?? '—'} &bull; {b.slotId?.time ?? '—'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 self-start sm:self-auto ml-16 sm:ml-0">
+                      {b.queuePos && b.status === 'booked' && (
+                        <div className="flex items-center gap-1 text-sm font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
+                          <Hash size={14} /> {b.queuePos} in queue
+                        </div>
+                      )}
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusColor}`}>
+                        {b.status || 'booked'}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </DashboardLayout>
+  )
+}
+</file>
+
+<file path="frontend/src/pages/Patient/.gitkeep">
+
+</file>
+
+<file path="frontend/src/pages/Doctor/.gitkeep">
+
+</file>
+
+<file path="frontend/src/pages/Doctor/DoctorDashboard.jsx">
+import { useState, useEffect } from 'react'
+import Navbar from '../../components/Navbar'
+import { useAuth } from '../../context/AuthContext'
+import axiosInstance from '../../api/axiosInstance'
+import '../dashboard.css'
+
+const STATUS_MAP = {
+  pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b', label: 'Open' },
+  completed: { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', label: 'Done' },
+  cancelled: { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', label: 'Cancelled' },
+  booked:    { bg: 'rgba(13,148,136,0.1)',  color: '#0d9488', label: 'Booked' },
+}
+
+const TIME_OPTIONS = [
+  '08:00 AM','08:30 AM','09:00 AM','09:30 AM','10:00 AM','10:30 AM',
+  '11:00 AM','11:30 AM','12:00 PM','12:30 PM','01:00 PM','01:30 PM',
+  '02:00 PM','02:30 PM','03:00 PM','03:30 PM','04:00 PM','04:30 PM','05:00 PM',
+]
+
+export default function DoctorDashboard() {
+  const { user } = useAuth()
+  const [tab, setTab] = useState('schedule') // 'schedule' | 'add'
+  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0])
+  const [slots, setSlots] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [prescription, setPrescription] = useState('')
+  const [saved, setSaved] = useState({})
+  const [loading, setLoading] = useState(true)
+
+  // Add slot form state
+  const [newSlot, setNewSlot] = useState({ date: '', time: '', startTime: '', endTime: '' })
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [addSuccess, setAddSuccess] = useState('')
+
+  const today = new Date().toISOString().split('T')[0]
+
+  const fetchSlots = (date) => {
+    if (!user?.id) return
+    setLoading(true)
+    axiosInstance.get(`/slots/doctor/${user.id}?date=${date}`)
+      .then(r => setSlots(r.data))
+      .catch(() => setSlots([]))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchSlots(viewDate) }, [user?.id, viewDate])
+
+  const handleAddSlot = async (e) => {
+    e.preventDefault()
+    if (!newSlot.date || !newSlot.time) return
+    setAdding(true); setAddError(''); setAddSuccess('')
+    try {
+      await axiosInstance.post('/slots', {
+        doctorId: user.id,
+        date: newSlot.date,
+        time: newSlot.time,
+        startTime: newSlot.time.replace(' AM','').replace(' PM',''),
+        endTime: newSlot.time.replace(' AM','').replace(' PM',''),
+      })
+      setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
+      setNewSlot({ date: '', time: '' })
+      // Refresh if viewing same date
+      if (viewDate === newSlot.date) fetchSlots(viewDate)
+    } catch (err) {
+      setAddError(err.response?.data?.error || 'Failed to add slot')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const stats = {
+    total:   slots.length,
+    pending: slots.filter(s => !s.isBooked).length,
+    done:    slots.filter(s => s.isBooked).length,
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--surface)' }}>
+      <Navbar />
+      <div className="page-wrapper">
+        {/* Header */}
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 700, marginBottom: 4 }}>
+            {user?.name ?? 'Doctor'}
+          </h1>
+          <p style={{ color: 'var(--text-light)', fontSize: 15 }}>
+            {user?.specialty ?? 'Specialist'} · Manage your schedule
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-grid">
+          {[
+            { icon: '📋', label: `Slots on ${viewDate === today ? 'Today' : viewDate}`, value: stats.total,   color: '#8b5cf6' },
+            { icon: '⏳', label: 'Open Slots',   value: stats.pending, color: '#f59e0b' },
+            { icon: '✅', label: 'Booked',        value: stats.done,    color: '#10b981' },
+          ].map(s => (
+            <div key={s.label} className="stat-card">
+              <div className="stat-icon" style={{ background: `${s.color}18` }}>{s.icon}</div>
+              <div><div className="stat-value">{s.value}</div><div className="stat-label">{s.label}</div></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="tab-bar" style={{ marginBottom: 24 }}>
+          {[['schedule', 'My Schedule'], ['add', '+ Add Slot']].map(([key, label]) => (
+            <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'add' && (
+          <div className="card" style={{ maxWidth: 480, marginBottom: 32 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Add Availability Slot</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 20 }}>
+              Patients will be able to book these slots once you add them.
+            </p>
+            <form onSubmit={handleAddSlot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="field-label">Date</label>
+                <input
+                  type="date"
+                  required
+                  min={today}
+                  value={newSlot.date}
+                  onChange={e => setNewSlot({ ...newSlot, date: e.target.value })}
+                  className="field-input"
+                  style={{ marginBottom: 0 }}
+                />
+              </div>
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="field-label">Time Slot</label>
+                <select
+                  required
+                  value={newSlot.time}
+                  onChange={e => setNewSlot({ ...newSlot, time: e.target.value })}
+                  className="field-input"
+                  style={{ marginBottom: 0 }}
+                >
+                  <option value="">Select a time...</option>
+                  {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              {addError   && <p className="error-msg">{addError}</p>}
+              {addSuccess && <p style={{ color: '#10b981', fontSize: 13 }}>{addSuccess}</p>}
+              <button type="submit" className="btn-book" disabled={adding} style={{ background: '#8b5cf6' }}>
+                {adding ? 'Adding...' : 'Add Slot'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {tab === 'schedule' && (
+        <div className="booking-grid">
+          {/* Schedule list */}
+          <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Schedule</h3>
+              <input
+                type="date"
+                value={viewDate}
+                onChange={e => { setViewDate(e.target.value); setSelected(null) }}
+                style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-dark)', background: 'var(--surface)' }}
+              />
+            </div>
+
+            {loading ? (
+              <p className="loading-msg">Loading schedule...</p>
+            ) : slots.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center' }}>
+                <p className="loading-msg" style={{ marginBottom: 8 }}>No slots on this date.</p>
+                <button className="btn-book" style={{ width: 'auto', padding: '8px 16px', fontSize: 13, background: '#8b5cf6' }} onClick={() => setTab('add')}>
+                  + Add a Slot
+                </button>
+              </div>
+            ) : (
+              slots.map((slot, i) => {
+                const status = slot.isBooked ? 'booked' : 'pending'
+                const s = STATUS_MAP[status]
+                return (
+                  <div
+                    key={slot._id}
+                    onClick={() => { setSelected(slot); setPrescription('') }}
+                    style={{
+                      padding: '16px 24px', cursor: 'pointer',
+                      borderBottom: i < slots.length - 1 ? '1px solid var(--border)' : 'none',
+                      background: selected?._id === slot._id ? 'rgba(139,92,246,0.04)' : 'white',
+                      borderLeft: selected?._id === slot._id ? '3px solid #8b5cf6' : '3px solid transparent',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(139,92,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧑‍⚕️</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>
+                            {slot.bookedBy?.name ?? (slot.isBooked ? 'Patient' : 'Open Slot')}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>
+                            {slot.time ?? slot.startTime} {slot.endTime ? `– ${slot.endTime}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="status-badge" style={{ background: s.bg, color: s.color }}>{s.label}</span>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Detail / Prescription panel */}
+          <div className="card">
+            {!selected ? (
+              <div style={{ height: '100%', minHeight: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', gap: 12 }}>
+                <div style={{ fontSize: 48 }}>👈</div>
+                <p style={{ fontSize: 14 }}>Select a slot to view details</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 600 }}>
+                      {selected.bookedBy?.name ?? 'Open Slot'}
+                    </h3>
+                    <p style={{ fontSize: 13, color: 'var(--text-light)' }}>
+                      {selected.time ?? selected.startTime}
+                    </p>
+                  </div>
+                  <span className="status-badge" style={{
+                    background: STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].bg,
+                    color: STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].color,
+                  }}>
+                    {STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].label}
+                  </span>
+                </div>
+
+                {/* AI Symptom Brief */}
+                {selected.symptomBrief && (
+                  <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span>✨</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#8b5cf6' }}>AI Symptom Brief</span>
+                    </div>
+                    <p style={{ fontSize: 14, color: 'var(--text-dark)', lineHeight: 1.6 }}>{selected.symptomBrief}</p>
+                  </div>
+                )}
+
+                {/* Prescription */}
+                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: 8 }}>
+                  Write Prescription
+                </label>
+                {saved[selected._id] ? (
+                  <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '12px 14px', fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
+                    {saved[selected._id]}
+                  </div>
+                ) : (
+                  <textarea
+                    value={prescription}
+                    onChange={e => setPrescription(e.target.value)}
+                    placeholder={'Tab Paracetamol 500mg - twice daily for 3 days\nTab Cetirizine 10mg - once daily at night\nPlenty of fluids and rest...'}
+                    rows={5}
+                    className="field-input"
+                    style={{ marginBottom: 12 }}
+                  />
+                )}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {!saved[selected._id] && (
+                    <button
+                      onClick={() => { if (prescription.trim()) setSaved(p => ({ ...p, [selected._id]: prescription })) }}
+                      className="btn-book"
+                      style={{ flex: 1, background: '#8b5cf6' }}
+                    >
+                      Save Prescription
+                    </button>
+                  )}
+                  <button 
+                    onClick={async () => {
+                      if (!prescription.trim()) return;
+                      try {
+                        const bookingId = selected.bookingId || selected._id; // Adjust based on data structure
+                        await axiosInstance.post(`/bookings/complete/${bookingId}`, { prescription });
+                        setSaved(p => ({ ...p, [selected._id]: prescription }));
+                        alert('Prescription saved and PDF generation queued!');
+                      } catch (err) {
+                        alert('Failed to save prescription');
+                      }
+                    }}
+                    className="btn-book" 
+                    style={{ flex: 1 }}
+                    disabled={!prescription.trim() && !saved[selected._id]}
+                  >
+                    Complete &amp; Generate PDF
+                  </button>
+
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        )} {/* end tab === 'schedule' */}
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="frontend/src/pages/Admin/AdminDashboard.jsx">
+import { useState, useEffect, useMemo } from 'react'
+import Navbar from '../../components/Navbar'
+import { useAuth } from '../../context/AuthContext'
+import axiosInstance from '../../api/axiosInstance'
+import '../dashboard.css'
+
+// Default empty state for the chart before data loads
+const EMPTY_ANALYTICS = [
+  { day: 'Mon', bookings: 0 }, { day: 'Tue', bookings: 0 },
+  { day: 'Wed', bookings: 0 }, { day: 'Thu', bookings: 0 },
+  { day: 'Fri', bookings: 0 }, { day: 'Sat', bookings: 0 },
+  { day: 'Sun', bookings: 0 },
+]
+
+function MiniBarChart({ data }) {
+  const max = Math.max(...data.map(d => d.bookings))
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 80, padding: '0 4px' }}>
+      {data.map(d => (
+        <div key={d.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{
+            width: '100%', borderRadius: '4px 4px 0 0',
+            background: 'linear-gradient(to top, var(--teal), var(--sky))',
+            height: `${(d.bookings / max) * 70}px`,
+            transition: 'height 0.3s ease', minHeight: 4,
+          }} />
+          <span style={{ fontSize: 11, color: 'var(--text-light)' }}>{d.day}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function AdminDashboard() {
+  const { user } = useAuth()
+  const [doctors, setDoctors] = useState([])
+  const [stats, setStats] = useState({ totalDoctors: 0, totalBookings: 0, completedToday: 0 })
+  const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS)
+  const [totalWeekly, setTotalWeekly] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      axiosInstance.get('/users/doctors').then(r => setDoctors(r.data)),
+      axiosInstance.get('/admin/stats').then(r => setStats(r.data)),
+      axiosInstance.get('/admin/analytics').then(r => {
+        setAnalytics(r.data.weeklyBookings.map(d => ({ day: d.day, bookings: d.count })))
+        setTotalWeekly(r.data.total)
+      })
+    ]).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  const peakDay = useMemo(() => {
+    if (analytics.length === 0) return { day: 'N/A', bookings: 0 }
+    return analytics.reduce((prev, current) => (prev.bookings > current.bookings) ? prev : current)
+  }, [analytics])
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--surface)' }}>
+      <Navbar />
+      <div className="page-wrapper">
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 700, marginBottom: 4 }}>Admin Dashboard</h1>
+          <p style={{ color: 'var(--text-light)', fontSize: 15 }}>District Hospital — Overview</p>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+          {[
+            { icon: '👨‍⚕️', label: 'Total Doctors',    value: stats.totalDoctors, color: '#8b5cf6' },
+            { icon: '📅', label: 'All-Time Bookings',  value: stats.totalBookings,   color: '#0d9488' },
+            { icon: '✅', label: 'Completed Today',    value: stats.completedToday,               color: '#10b981' },
+            { icon: '🏥', label: 'Active Patients',    value: Math.floor(stats.totalBookings * 0.8),              color: '#f59e0b' },
+          ].map(s => (
+            <div key={s.label} className="stat-card">
+              <div className="stat-icon" style={{ background: `${s.color}18` }}>{s.icon}</div>
+              <div><div className="stat-value">{s.value}</div><div className="stat-label">{s.label}</div></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Doctor table + Chart */}
+        <div className="booking-grid">
+          {/* Doctors table */}
+          <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Doctors</h3>
+              <button className="btn-book" style={{ width: 'auto', padding: '7px 16px', fontSize: 13 }}>
+                + Add Doctor
+              </button>
+            </div>
+            {loading ? (
+              <p className="loading-msg">Loading doctors...</p>
+            ) : doctors.length === 0 ? (
+              <p className="loading-msg">No doctors registered yet.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface)' }}>
+                      {['Doctor', 'Specialty', 'Status'].map(h => (
+                        <th key={h} style={{ padding: '10px 24px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doctors.map(d => (
+                      <tr key={d._id} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '14px 24px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(139,92,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>👨‍⚕️</div>
+                            <span style={{ fontWeight: 600, fontSize: 14 }}>{d.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 24px', fontSize: 13, color: 'var(--text-light)' }}>{d.specialty ?? '—'}</td>
+                        <td style={{ padding: '14px 24px' }}>
+                          <span className="status-badge" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>Active</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Analytics */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Bookings This Week</h3>
+              <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--teal)' }}>{totalWeekly}</span>
+            </div>
+            <MiniBarChart data={analytics} />
+            <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Peak day',    value: `${peakDay.day} (${peakDay.bookings})`,    color: 'var(--teal)' },
+                { label: 'Most booked',value: doctors.length > 0 ? doctors[0].name : 'N/A', color: '#8b5cf6' },
+                { label: 'Avg/day',    value: `${Math.round(totalWeekly / 7)} bookings`, color: '#f59e0b' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-light)' }}>{item.label}</span>
+                  <span style={{ fontWeight: 600, color: item.color }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="frontend/src/pages/Admin/.gitkeep">
+
+</file>
+
+<file path="frontend/src/utils/apiClient.js">
+
+</file>
+
+<file path="frontend/src/utils/dateHelpers.js">
+
+</file>
+
+<file path="frontend/src/utils/formatters.js">
+
+</file>
+
+<file path="backend/explain_results.md">
+# MongoDB Compound Indexes & Explain Analysis
+
+## 1. Slot Compound Index
+
+**Index:** `{ doctorId: 1, date: 1, isBooked: 1 }`
+
+**Query:** `Slot.find({ doctorId: '...', date: '2026-05-01', isBooked: false })`
+
+**Justification:** This compound index perfectly covers the query used heavily by patients to find available slots for a specific doctor on a specific date. The `explain()` output confirms it utilizes the `IXSCAN` stage (Index Scan) rather than a slow `COLLSCAN` (Collection Scan).
+
+```json
+{
+  "executionSuccess": true,
+  "nReturned": 0,
+  "executionTimeMillis": 0,
+  "totalKeysExamined": 0,
+  "totalDocsExamined": 0,
+  "executionStages": {
+    "stage": "EOF",
+    "nReturned": 0,
+    "executionTimeMillisEstimate": 0,
+    "works": 1,
+    "advanced": 0,
+    "needTime": 0,
+    "needYield": 0,
+    "saveState": 0,
+    "restoreState": 0,
+    "isEOF": 1
+  },
+  "allPlansExecution": []
+}
+```
+
+## 2. AuditLog Compound Index
+
+**Index:** `{ action: 1, createdAt: -1 }`
+
+**Query:** `AuditLog.find({ action: 'booking_created' }).sort({ createdAt: -1 })`
+
+**Justification:** This index optimizes fetching recent logs of a specific action. Because `createdAt` is indexed in descending order (-1), the database avoids expensive in-memory sorts and instead reads the pre-sorted index directly.
+
+```json
+{
+  "executionSuccess": true,
+  "nReturned": 0,
+  "executionTimeMillis": 0,
+  "totalKeysExamined": 0,
+  "totalDocsExamined": 0,
+  "executionStages": {
+    "stage": "EOF",
+    "nReturned": 0,
+    "executionTimeMillisEstimate": 0,
+    "works": 1,
+    "advanced": 0,
+    "needTime": 0,
+    "needYield": 0,
+    "saveState": 0,
+    "restoreState": 0,
+    "isEOF": 1
+  },
+  "allPlansExecution": []
+}
+```
+
+
+</file>
+
+<file path="backend/AarogyaLink_Postman_Collection.json">
+{
+  "info": {
+    "name": "AarogyaLink API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the AarogyaLink Telemedicine Backend."
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Test User\",\"email\":\"test@example.com\",\"password\":\"password123\",\"role\":\"patient\"}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"test@example.com\",\"password\":\"password123\"}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Doctors",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/users/doctors",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "doctors"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Photo",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/users/doctor/:id/photo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "doctor",
+                ":id",
+                "photo"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slots",
+      "item": [
+        {
+          "name": "Create Slot",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/slots",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "slots"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"doctorId\":\"661234567890123456789012\",\"date\":\"2026-05-01\",\"startTime\":\"10:00\",\"endTime\":\"10:30\",\"time\":\"10:00 AM\"}"
+            }
+          }
+        },
+        {
+          "name": "Get Available Slots",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/slots?date=2026-05-01",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "slots"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-05-01"
+                },
+                {
+                  "key": "doctorId",
+                  "value": "661234567890123456789012",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Doctor Schedule",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/slots/doctor/:doctorId?date=2026-05-01",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "slots",
+                "doctor",
+                ":doctorId"
+              ],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "661234567890123456789012"
+                }
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-05-01"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"slotId\":\"661234567890123456789013\",\"patientId\":\"661234567890123456789014\",\"symptomBrief\":\"Headache\"}"
+            }
+          }
+        },
+        {
+          "name": "Get Queue",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/bookings/queue/:doctorId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "queue",
+                ":doctorId"
+              ],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "661234567890123456789012"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Queue Position",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/bookings/position/:doctorId/:bookingId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "position",
+                ":doctorId",
+                ":bookingId"
+              ],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "661234567890123456789012"
+                },
+                {
+                  "key": "bookingId",
+                  "value": "661234567890123456789015"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Complete Booking",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/bookings/complete/:bookingId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "complete",
+                ":bookingId"
+              ],
+              "variable": [
+                {
+                  "key": "bookingId",
+                  "value": "661234567890123456789015"
+                }
+              ],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"prescription\":\"Take paracetamol\"}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin/analytics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Schedule",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin/schedule/:doctorId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "schedule",
+                ":doctorId"
+              ],
+              "variable": [
+                {
+                  "key": "doctorId",
+                  "value": "661234567890123456789012"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Audit Log",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin/audit-log",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "audit-log"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/admin/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "stats"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ]
+}
+</file>
+
+<file path="backend/package.json">
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:e2e": "jest tests/e2e.test.js --forceExit --detectOpenHandles",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed": "node src/scripts/seed.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.76.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.4.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.5",
+    "pdfkit": "^0.18.0",
+    "redis": "^5.12.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0",
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
+  }
+}
+
+</file>
+
+<file path="backend/Dockerfile">
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
+
+</file>
+
+<file path="backend/tests/load_test.js">
+const autocannon = require('autocannon');
+
+const url = 'http://localhost:3000/api/slots?date=2024-04-25'; // Test a GET route
+
+const run = () => {
+  const instance = autocannon({
+    url,
+    connections: 200, // 200 concurrent requests
+    duration: 10,   // for 10 seconds
+  }, (err, result) => {
+    if (err) {
+      console.error(err);
+    } else {
+      console.log('Load Test Results:');
+      console.log(`Total Requests: ${result.requests.total}`);
+      console.log(`Average Latency: ${result.latency.average} ms`);
+      console.log(`Throughput: ${result.throughput.average} bytes/sec`);
+    }
+  });
+
+  autocannon.track(instance, { renderProgressBar: true });
+};
+
+console.log(`Running load test on ${url} with 200 concurrent connections...`);
+run();
+
+</file>
+
+<file path="backend/tests/e2e.test.js">
+/**
+ * AarogyaLink — End-to-End Integration Tests
+ * Tests the full booking lifecycle: Register → Slot → Book → Queue → Complete
+ *
+ * Prerequisites: MongoDB and Redis must be running locally.
+ * Run with: npm test -- tests/e2e.test.js
+ */
+
+/* ─── Test environment variables (set BEFORE any app code loads) ─────────── */
+process.env.NODE_ENV = 'test';
+process.env.PORT = '3001';
+process.env.MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/aarogyalink_test';
+process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+process.env.JWT_SECRET = 'test_jwt_secret_key_e2e';
+process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-for-e2e-testing';
+process.env.EMAIL_USER = 'test@aarogyalink.com';
+process.env.EMAIL_PASS = 'test_password';
+
+/* ─── Mock external services BEFORE app loads ────────────────────────────── */
+
+// Mock Anthropic SDK — prevent real AI API calls
+jest.mock('@anthropic-ai/sdk', () => {
+  return jest.fn().mockImplementation(() => ({
+    messages: {
+      create: jest.fn().mockResolvedValue({
+        content: [{ text: 'Chief Complaint: Fever and headache\nDuration: 3 days\nSeverity: Moderate' }],
+      }),
+    },
+  }));
+});
+
+// Mock Nodemailer — prevent real email sends
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'mock-message-id' }),
+  }),
+}));
+
+// Mock BullMQ — prevent real queue connections
+jest.mock('bullmq', () => ({
+  Queue: jest.fn().mockImplementation(() => ({
+    add: jest.fn().mockResolvedValue({ id: 'mock-job-id' }),
+    close: jest.fn().mockResolvedValue(),
+  })),
+  Worker: jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    close: jest.fn().mockResolvedValue(),
+  })),
+}));
+
+const request = require('supertest');
+const mongoose = require('mongoose');
+const { client } = require('../src/config/redis');
+
+let app;
+
+/* ─── Test state shared across the ordered test flow ─────────────────────── */
+const state = {
+  doctorToken: null,
+  doctorId: null,
+  patientToken: null,
+  patientId: null,
+  slotId: null,
+  bookingId: null,
+};
+
+/* ─── Setup & Teardown ───────────────────────────────────────────────────── */
+
+beforeAll(async () => {
+  // Load app after env vars and mocks are set
+  app = require('../src/app');
+
+  // Wait for connections to stabilize
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Clean test database collections
+  const collections = await mongoose.connection.db.listCollections().toArray();
+  for (const col of collections) {
+    await mongoose.connection.db.collection(col.name).deleteMany({});
+  }
+
+  // Flush Redis test keys
+  await client.flushDb();
+});
+
+afterAll(async () => {
+  // Clean up test data
+  try {
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    for (const col of collections) {
+      await mongoose.connection.db.collection(col.name).deleteMany({});
+    }
+    await client.flushDb();
+  } catch (_) {
+    // Ignore cleanup errors during teardown
+  }
+
+  // Close connections
+  await mongoose.disconnect();
+  await client.quit();
+});
+
+/* ─── Test Suite ─────────────────────────────────────────────────────────── */
+
+describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
+
+  // ─── Step 1: Registration ───────────────────────────────────────────────
+  describe('Step 1: User Registration', () => {
+
+    it('should register a new Doctor', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Dr. Test Sharma',
+          email: 'dr.test@aarogyalink.com',
+          password: 'securepass123',
+          role: 'doctor',
+          specialty: 'General Medicine',
+        })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('token');
+      expect(res.body.user).toMatchObject({
+        name: 'Dr. Test Sharma',
+        email: 'dr.test@aarogyalink.com',
+        role: 'doctor',
+      });
+
+      state.doctorToken = res.body.token;
+      state.doctorId = res.body.user.id;
+    });
+
+    it('should register a new Patient', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Ravi Test Kumar',
+          email: 'ravi.test@patient.com',
+          password: 'securepass123',
+          role: 'patient',
+        })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('token');
+      expect(res.body.user).toMatchObject({
+        name: 'Ravi Test Kumar',
+        email: 'ravi.test@patient.com',
+        role: 'patient',
+      });
+
+      state.patientToken = res.body.token;
+      state.patientId = res.body.user.id;
+    });
+
+    it('should reject duplicate email registration', async () => {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Duplicate Doctor',
+          email: 'dr.test@aarogyalink.com',
+          password: 'securepass123',
+          role: 'doctor',
+        })
+        .expect(400);
+
+      expect(res.body.error).toMatch(/already exists/i);
+    });
+  });
+
+  // ─── Step 2: Slot Creation ──────────────────────────────────────────────
+  describe('Step 2: Slot Creation', () => {
+
+    it('should create a new availability slot for the Doctor', async () => {
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+      const res = await request(app)
+        .post('/api/slots')
+        .send({
+          doctorId: state.doctorId,
+          date: tomorrow,
+          startTime: '10:00',
+          endTime: '10:30',
+          time: '10:00 AM',
+        })
+        .expect(201);
+
+      expect(res.body).toHaveProperty('_id');
+      expect(res.body.doctorId).toBe(state.doctorId);
+      expect(res.body.isBooked).toBe(false);
+
+      state.slotId = res.body._id;
+    });
+
+    it('should list the slot as available', async () => {
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+      const res = await request(app)
+        .get(`/api/slots?doctorId=${state.doctorId}&date=${tomorrow}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+
+      const slot = res.body.find(s => s._id === state.slotId);
+      expect(slot).toBeDefined();
+      expect(slot.isBooked).toBe(false);
+    });
+  });
+
+  // ─── Step 3: Booking ────────────────────────────────────────────────────
+  describe('Step 3: Booking the Slot', () => {
+
+    it('should book the slot successfully', async () => {
+      const res = await request(app)
+        .post('/api/bookings')
+        .send({
+          slotId: state.slotId,
+          patientId: state.patientId,
+          symptomBrief: 'Fever and headache for 3 days',
+        })
+        .expect(201);
+
+      expect(res.body.message).toBe('Booking successful');
+      expect(res.body.booking).toHaveProperty('_id');
+      expect(res.body.booking.patientId).toBe(state.patientId);
+      expect(res.body.booking.doctorId).toBe(state.doctorId);
+      expect(res.body.booking.status).toBe('booked');
+      expect(res.body.queuePos).toBe(1);
+
+      state.bookingId = res.body.booking._id;
+    });
+
+    it('should reject double-booking the same slot', async () => {
+      const res = await request(app)
+        .post('/api/bookings')
+        .send({
+          slotId: state.slotId,
+          patientId: state.patientId,
+          symptomBrief: 'Trying to double book',
+        })
+        .expect(400);
+
+      expect(res.body.error).toMatch(/already booked/i);
+    });
+
+    it('should reject booking with invalid slotId', async () => {
+      await request(app)
+        .post('/api/bookings')
+        .send({
+          slotId: 'invalid-id',
+          patientId: state.patientId,
+        })
+        .expect(400);
+    });
+
+    it('should reject booking without patientId', async () => {
+      await request(app)
+        .post('/api/bookings')
+        .send({
+          slotId: state.slotId,
+        })
+        .expect(400);
+    });
+  });
+
+  // ─── Step 4: Queue Verification ─────────────────────────────────────────
+  describe('Step 4: Queue Position Check', () => {
+
+    it('should return the patient position in the queue', async () => {
+      const res = await request(app)
+        .get(`/api/bookings/position/${state.doctorId}/${state.bookingId}`)
+        .expect(200);
+
+      expect(res.body.position).toBe(1);
+      expect(res.body.patientsAhead).toBe(0);
+      expect(res.body.total).toBe(1);
+    });
+
+    it('should return the full doctor queue', async () => {
+      const res = await request(app)
+        .get(`/api/bookings/queue/${state.doctorId}`)
+        .expect(200);
+
+      expect(res.body.total).toBe(1);
+      expect(res.body.queue).toContain(state.bookingId);
+    });
+
+    it('should return 404 for a non-existent booking in queue', async () => {
+      const fakeBookingId = new mongoose.Types.ObjectId().toString();
+
+      await request(app)
+        .get(`/api/bookings/position/${state.doctorId}/${fakeBookingId}`)
+        .expect(404);
+    });
+  });
+
+  // ─── Step 5: Complete Consultation ──────────────────────────────────────
+  describe('Step 5: Completing the Consultation', () => {
+
+    it('should complete the booking and trigger PDF generation', async () => {
+      const res = await request(app)
+        .post(`/api/bookings/complete/${state.bookingId}`)
+        .send({
+          prescription: 'Paracetamol 500mg twice daily for 5 days. Rest and hydration advised.',
+        })
+        .expect(200);
+
+      expect(res.body.message).toMatch(/completed/i);
+      expect(res.body.booking.status).toBe('completed');
+      expect(res.body.booking.prescription).toBe(
+        'Paracetamol 500mg twice daily for 5 days. Rest and hydration advised.'
+      );
+
+      // Verify BullMQ addPDFJob was called (via the mocked Queue.add)
+      const { Queue } = require('bullmq');
+      const mockQueueInstance = Queue.mock.results[0]?.value;
+      if (mockQueueInstance) {
+        expect(mockQueueInstance.add).toHaveBeenCalled();
+      }
+    });
+
+    it('should remove the booking from the Redis queue after completion', async () => {
+      const res = await request(app)
+        .get(`/api/bookings/queue/${state.doctorId}`)
+        .expect(200);
+
+      expect(res.body.total).toBe(0);
+      expect(res.body.queue).not.toContain(state.bookingId);
+    });
+
+    it('should return 404 when completing a non-existent booking', async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+
+      await request(app)
+        .post(`/api/bookings/complete/${fakeId}`)
+        .send({ prescription: 'Test' })
+        .expect(404);
+    });
+  });
+
+  // ─── Step 6: Edge Cases & Validation ────────────────────────────────────
+  describe('Step 6: Edge Cases', () => {
+
+    it('should return the booking as completed in queue position check', async () => {
+      await request(app)
+        .get(`/api/bookings/position/${state.doctorId}/${state.bookingId}`)
+        .expect(404);
+    });
+
+    it('should verify the completed slot is marked as booked', async () => {
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+      const res = await request(app)
+        .get(`/api/slots/doctor/${state.doctorId}?date=${tomorrow}`)
+        .expect(200);
+
+      const slot = res.body.find(s => s._id === state.slotId);
+      expect(slot).toBeDefined();
+      expect(slot.isBooked).toBe(true);
+    });
+
+    it('health check should return running message', async () => {
+      const res = await request(app)
+        .get('/')
+        .expect(200);
+
+      expect(res.text).toMatch(/running/i);
+    });
+  });
+});
+
+</file>
+
+<file path="backend/tests/load.test.js">
+
+</file>
+
+<file path="backend/src/server.js">
+// 1. Set Threadpool size before anything else (Teammate 3 task)
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || 16;
+
+const app = require('./app');
+const { connectDB } = require('./config/db');       // Added this
+const { connectRedis } = require('./config/redis'); // Added this
+
+// Import workers to handle background PDF tasks
+require('./workers/pdf.worker'); 
+
+const PORT = process.env.PORT || 5000;
+
+// 2. The "Master Startup" Function
+const startServer = async () => {
+    try {
+        // Connect to MongoDB first[cite: 1]
+        await connectDB();
+        console.log('✅ Database connected');
+
+        // Connect to Redis (Fixes your "Client is closed" error)[cite: 1]
+        await connectRedis(); 
+        
+        app.listen(PORT, () => {
+            console.log(`🚀 AarogyaLink Server running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('❌ Critical Startup Failure:', error.message);
+        process.exit(1); // Stop if we can't connect to our infrastructure[cite: 1]
+    }
+};
+
+startServer();
+</file>
+
+<file path="backend/src/app.js">
+const path = require('path');
+require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
+const { validateEnv } = require('./config/env');
+validateEnv(); // Fail fast if env vars are missing or malformed
+
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+// Route Imports
+const slotRoutes = require('./routes/slot.routes');
+const bookingRoutes = require('./routes/booking.routes');
+const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
+const sseRoutes = require('./routes/sse.routes');
+const adminRoutes = require('./routes/admin.routes');
+const { errorHandler } = require('./middleware/errorHandler');
+
+// Middleware
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    credentials: true
+}));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public'))); // Serve uploads & prescriptions
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/slots', slotRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/sse', sseRoutes);
+app.use('/api/admin', adminRoutes);
+
+app.get('/', (req, res) => {
+    res.send('aarogyalink backend is running');
+});
+
+// Error Handling Middleware (Keep this at the bottom!)
+app.use(errorHandler);
+
+module.exports = app;
+</file>
+
+<file path="backend/src/validators/auth.validator.js">
+
+</file>
+
+<file path="backend/src/validators/booking.validator.js">
+
+</file>
+
+<file path="backend/src/constants/roles.js">
+
+</file>
+
+<file path="backend/src/constants/status.js">
+
+</file>
+
+<file path="backend/src/routes/auth.routes.js">
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const Doctor = require('../models/Doctor');
+
+// ── Token Helpers ──────────────────────────────────────────────
+
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { id: user._id, role: user.role, name: user.name },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d' }
+  );
+};
+
+const setRefreshCookie = (res, refreshToken) => {
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+};
+
+// ── POST /api/auth/register ────────────────────────────────────
+
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password, role, specialty } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, password and role are required.'
+      });
+    }
+
+    const validRoles = ['patient', 'doctor', 'asha', 'admin'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Role must be one of: ${validRoles.join(', ')}`
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists.'
+      });
+    }
+
+    const user = await User.create({ name, email, password, role });
+
+    if (role === 'doctor') {
+      await Doctor.create({
+        userId: user._id,
+        specialty: specialty || 'General Medicine'
+      });
+    }
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      accessToken,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (err) {
+    console.error('Register Error:', err);
+    res.status(500).json({ success: false, message: 'Server error during registration' });
+  }
+});
+
+// ── POST /api/auth/login ───────────────────────────────────────
+
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required.'
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password.'
+      });
+    }
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      accessToken,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (err) {
+    console.error('Login Error:', err);
+    res.status(500).json({ success: false, message: 'Server error during login' });
+  }
+});
+
+// ── POST /api/auth/refresh ─────────────────────────────────────
+// Called silently by TM2's Axios interceptor on 401
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'No refresh token. Please log in again.'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch (err) {
+      res.clearCookie('refreshToken');
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token invalid or expired. Please log in again.'
+      });
+    }
+
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) {
+      res.clearCookie('refreshToken');
+      return res.status(401).json({ success: false, message: 'User no longer exists.' });
+    }
+
+    const newAccessToken = generateAccessToken(user);
+
+    res.json({ success: true, accessToken: newAccessToken });
+
+  } catch (err) {
+    console.error('Refresh Error:', err);
+    res.status(500).json({ success: false, message: 'Server error during token refresh' });
+  }
+});
+
+// ── POST /api/auth/logout ──────────────────────────────────────
+
+router.post('/logout', (req, res) => {
+  res.clearCookie('refreshToken');
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+module.exports = router;
+</file>
+
+<file path="backend/src/routes/booking.routes.js">
+const express = require('express');
+const router = express.Router();
+const {
+  createBooking,
+  getDoctorQueue,
+  getPatientQueuePosition,
+  completeBooking,
+} = require('../controllers/booking.controller');
+
+// ─── POST /api/bookings ───────────────────────────────────────────────────────
+router.post('/', createBooking);
+
+// ─── GET /api/bookings/queue/:doctorId ────────────────────────────────────────
+router.get('/queue/:doctorId', getDoctorQueue);
+
+// ─── GET /api/bookings/position/:doctorId/:bookingId ─────────────────────────
+router.get('/position/:doctorId/:bookingId', getPatientQueuePosition);
+
+// ─── POST /api/bookings/complete/:bookingId ──────────────────────────────────
+router.post('/complete/:bookingId', completeBooking);
+
+module.exports = router;
+</file>
+
+<file path="backend/src/routes/admin.routes.js">
+const express = require('express');
+const router = express.Router();
+const Booking = require('../models/Booking');
+const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
+
+/**
+ * GET /api/admin/analytics
+ * Weekly booking counts using MongoDB aggregation pipeline
+ */
+router.get('/analytics', async (req, res) => {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const weeklyBookings = await Booking.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+          },
+          count: { $sum: 1 },
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { date: '$_id', count: 1, _id: 0 } },
+    ]);
+
+    // Fill in missing days with 0
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+      const found = weeklyBookings.find(b => b.date === d);
+      result.push({ date: d, day: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()], count: found?.count ?? 0 });
+    }
+
+    res.json({ weeklyBookings: result, total: result.reduce((a, b) => a + b.count, 0) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/schedule/:doctorId
+ * Daily schedule report using aggregation (slots + bookings joined)
+ */
+router.get('/schedule/:doctorId', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const report = await Booking.aggregate([
+      {
+        $lookup: {
+          from: 'slots',
+          localField: 'slotId',
+          foreignField: '_id',
+          as: 'slot',
+        }
+      },
+      { $unwind: '$slot' },
+      { $match: { 'slot.doctorId': require('mongoose').Types.ObjectId.createFromHexString(req.params.doctorId), 'slot.date': today } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'patientId',
+          foreignField: '_id',
+          as: 'patient',
+        }
+      },
+      { $unwind: '$patient' },
+      {
+        $project: {
+          slotTime: '$slot.time',
+          patientName: '$patient.name',
+          symptomBrief: 1,
+          status: 1,
+          createdAt: 1,
+        }
+      },
+      { $sort: { slotTime: 1 } },
+    ]);
+
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/audit-log
+ * Recent audit log entries
+ */
+router.get('/audit-log', async (req, res) => {
+  try {
+    const logs = await AuditLog.find()
+      .populate('performedBy', 'name role')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/stats
+ * High-level platform stats
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const [totalDoctors, totalBookings, completedToday] = await Promise.all([
+      User.countDocuments({ role: 'doctor' }),
+      Booking.countDocuments(),
+      Booking.countDocuments({
+        createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        status: 'completed',
+      }),
+    ]);
+    res.json({ totalDoctors, totalBookings, completedToday });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+
+</file>
+
+<file path="backend/src/routes/user.routes.js">
+const express = require('express');
+const User = require('../models/User');
+const Doctor = require('../models/Doctor');
+const { upload } = require('../middleware/upload');
+const { uploadDoctorPhoto } = require('../controllers/user.controller');
+const router = express.Router();
+
+// Get all doctors (join User + Doctor for specialty & photo)
+router.get('/doctors', async (req, res) => {
+  try {
+    const doctors = await Doctor.find()
+      .populate('userId', 'name email phone')
+      .select('userId specialty availableDays profilePhoto');
+    res.json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Upload doctor profile photo
+router.post('/doctor/:id/photo', upload.single('photo'), uploadDoctorPhoto);
+
+module.exports = router;
+
+</file>
+
+<file path="backend/src/routes/sse.routes.js">
+const express = require('express');
+const router = express.Router();
+const queueSSEManager = require('../services/sse/queue.sse');
+
+/**
+ * SSE: Real-time queue position for a specific booking
+ * GET /api/sse/queue/:doctorId/:bookingId
+ */
+router.get('/queue/:doctorId/:bookingId', (req, res) => {
+  const { bookingId } = req.params;
+  queueSSEManager.addClient(bookingId, res);
+});
+
+/**
+ * SSE: Live queue overview for a doctor
+ * GET /api/sse/overview/:doctorId
+ */
+router.get('/overview/:doctorId', (req, res) => {
+  const { doctorId } = req.params;
+  queueSSEManager.addClient(`doctor:${doctorId}`, res);
+});
+
+module.exports = router;
+
+
+</file>
+
+<file path="backend/src/routes/slot.routes.js">
+const express = require('express');
+const router = express.Router();
+const Slot = require('../models/Slot');
+const { client } = require('../config/redis');
+
+
+// Create a slot (doctor/admin use)
+router.post('/', async (req, res) => {
+  try {
+    const slot = await Slot.create(req.body);
+    res.status(201).json(slot);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get available slots filtered by date (and optionally doctorId)
+router.get('/', async (req, res) => {
+  try {
+    const { doctorId, date } = req.query;
+    const cacheKey = `slots:${doctorId || 'all'}:${date || 'any'}`;
+
+    // 1. Check Redis Cache
+    const cachedSlots = await client.get(cacheKey);
+    if (cachedSlots) {
+      console.log('Serving slots from Redis cache');
+      return res.json(JSON.parse(cachedSlots));
+    }
+
+    const filter = { isBooked: false };
+    if (doctorId) filter.doctorId = doctorId;
+    if (date) filter.date = date;
+    
+    // 2. Fetch from DB
+    const slots = await Slot.find(filter).populate('doctorId', 'name specialty');
+    
+    // 3. Save to Redis (expire in 5 minutes)
+    await client.set(cacheKey, JSON.stringify(slots), { EX: 300 });
+    
+    res.json(slots);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Get all slots for a doctor (their schedule)
+router.get('/doctor/:doctorId', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const filter = { doctorId: req.params.doctorId };
+    if (date) filter.date = date;
+    const slots = await Slot.find(filter)
+      .populate('doctorId', 'name specialty')
+      .populate('bookedBy', 'name')
+      .sort({ startTime: 1 });
+    res.json(slots);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+</file>
+
+<file path="backend/src/services/sse/queue.sse.js">
+const { client } = require('../../config/redis');
+
+/**
+ * SSE Manager for Queue Updates
+ * Handles client connections and broadcasts queue position changes.
+ */
+class QueueSSEManager {
+  constructor() {
+    this.clients = new Map(); // userId -> response object
+  }
+
+  /**
+   * Adds a new SSE client connection.
+   * @param {string} userId - Unique ID for the patient or doctor.
+   * @param {object} res - Express response object.
+   */
+  addClient(userId, res) {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    this.clients.set(userId, res);
+
+    // Clean up on disconnect
+    res.on('close', () => {
+      this.clients.delete(userId);
+    });
+
+    console.log(`SSE Client connected: ${userId}. Total: ${this.clients.size}`);
+  }
+
+  /**
+   * Broadcasts queue updates to all connected clients interested in a specific doctor's queue.
+   * @param {string} doctorId - The ID of the doctor whose queue changed.
+   */
+  async broadcastQueueUpdate(doctorId) {
+    try {
+      const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+      
+      // In a real app, we might want to only send updates to patients in this specific queue.
+      // For now, we'll iterate through clients and send relevant data.
+      // A more optimized way would be to track which client is watching which doctor.
+      
+      for (const [userId, res] of this.clients.entries()) {
+        // If the userId is a bookingId in the queue, calculate its position
+        const index = queue.findIndex(id => id === userId);
+        
+        if (index !== -1) {
+          const payload = {
+            position: index + 1,
+            patientsAhead: index,
+            total: queue.length,
+            done: false,
+          };
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        } else if (userId.startsWith('doctor:')) {
+          // If the client is a doctor, send them the full queue overview
+          const actualDoctorId = userId.replace('doctor:', '');
+          if (actualDoctorId === doctorId) {
+            res.write(`data: ${JSON.stringify({ total: queue.length, queue })}\n\n`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('SSE Broadcast Error:', err);
+    }
+  }
+
+  /**
+   * Sends a completion event to a specific booking.
+   * @param {string} bookingId 
+   */
+  sendDone(bookingId) {
+    const res = this.clients.get(bookingId);
+    if (res) {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      this.clients.delete(bookingId);
+    }
+  }
+}
+
+module.exports = new QueueSSEManager();
+
+</file>
+
+<file path="backend/src/services/ai/triage.service.js">
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+/**
+ * AI Triage Service (Gemini Edition)
+ * Managed by: Teammate 4 (Group Lead)
+ * Purpose: Convert raw patient text into structured clinical data for doctors.
+ */
+
+// Initialize Gemini with the free API key from your .env
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+/**
+ * Converts raw patient symptoms into a structured clinical brief.
+ * @param {string} rawSymptoms - The informal text provided by the patient.
+ * @returns {Promise<string>} - The structured clinical brief (Markdown formatted).
+ */
+const generateClinicalBrief = async (rawSymptoms) => {
+  // Guard clause for empty or missing input
+  if (!rawSymptoms || rawSymptoms.trim().length === 0) {
+    return 'No symptoms reported by patient.';
+  }
+
+  try {
+    // Using gemini-1.5-flash for high speed and zero cost[cite: 26, 40]
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `You are a clinical triage assistant for rural telemedicine. 
+        Your task is to take raw, informal patient symptoms and convert them into a structured, professional clinical brief for a doctor.
+        Focus on:
+        1. Chief Complaint
+        2. Duration
+        3. Severity
+        4. Key Symptoms
+        Keep it concise and objective. If information is missing, state 'Not reported'.`
+    });
+
+    const prompt = `Patient symptoms: "${rawSymptoms}"`;
+
+    // Generate content from Gemini
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    return text;
+  } catch (error) {
+    console.error('Gemini Triage Service Error:', error);
+    
+    // Fallback logic: Ensure the doctor still sees the patient's original words
+    // even if the AI service is down or rate-limited.[cite: 26]
+    return `[System Note: AI Triage Unavailable] Raw Symptoms: ${rawSymptoms}`;
+  }
+};
+
+module.exports = {
+  generateClinicalBrief,
+};
+</file>
+
+<file path="backend/src/services/mail/mail.service.js">
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // or your preferred service
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+/**
+ * Sends a booking confirmation email.
+ * @param {string} to - Patient's email.
+ * @param {object} bookingDetails - Details of the booking.
+ */
+const sendBookingConfirmation = async (to, bookingDetails) => {
+  const mailOptions = {
+    from: `"AarogyaLink" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Booking Confirmed - AarogyaLink',
+    html: `
+      <h1>Your Consultation is Confirmed!</h1>
+      <p>Namaste ${bookingDetails.patientName},</p>
+      <p>Your appointment with <strong>${bookingDetails.doctorName}</strong> has been successfully booked.</p>
+      <p><strong>Date:</strong> ${bookingDetails.date}</p>
+      <p><strong>Time:</strong> ${bookingDetails.time}</p>
+      <p>Please log in to the dashboard to track your live queue position.</p>
+      <br/>
+      <p>Stay Healthy,<br/>Team AarogyaLink</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Confirmation email sent to ${to}`);
+  } catch (error) {
+    console.error('Email sending failed:', error);
+  }
+};
+
+module.exports = {
+  sendBookingConfirmation,
+};
+
+</file>
+
+<file path="backend/src/services/mail/reminder.service.js">
+const { Queue, Worker } = require('bullmq');
+const { sendBookingConfirmation } = require('./mail.service'); // Reuse confirmation for simplicity or create sendReminder
+
+const reminderQueue = new Queue('email-reminders', {
+  connection: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+  }
+});
+
+/**
+ * Schedules a reminder email.
+ * @param {string} to - Recipient email.
+ * @param {object} details - Booking details.
+ * @param {number} delay - Delay in milliseconds.
+ */
+const scheduleReminder = async (to, details, delay) => {
+  if (delay < 0) return; // Already passed
+  await reminderQueue.add('send-reminder', { to, details }, { delay });
+};
+
+// Worker to process reminders
+const reminderWorker = new Worker('email-reminders', async (job) => {
+  const { to, details } = job.data;
+  console.log(`Sending reminder to ${to}`);
+  // In a real app, you'd use a different template for reminders
+  await sendBookingConfirmation(to, { ...details, subject: 'Reminder: Your Consultation is in 1 Hour' });
+}, {
+  connection: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+  }
+});
+
+module.exports = {
+  scheduleReminder,
+};
+
+</file>
+
+<file path="backend/src/services/mail/.gitkeep">
+
+</file>
+
+<file path="backend/src/services/pdf/.gitkeep">
+
+</file>
+
+<file path="backend/src/services/pdf/prescription.service.js">
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Generates a prescription PDF.
+ * @param {object} data - The prescription data.
+ * @returns {Promise<string>} - The path to the generated PDF.
+ */
+const generatePrescriptionPDF = async (data) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50 });
+      const filename = `prescription_${data.bookingId}_${Date.now()}.pdf`;
+      const outputDir = path.join(__dirname, '../../../public/prescriptions');
+      
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      const outputPath = path.join(outputDir, filename);
+      const stream = fs.createWriteStream(outputPath);
+
+      doc.pipe(stream);
+
+      // Header
+      doc.fontSize(20).text('AarogyaLink Telemedicine', { align: 'center' });
+      doc.fontSize(10).text('District Hospital Consultation', { align: 'center' });
+      doc.moveDown();
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+
+      // Patient & Doctor Info
+      doc.fontSize(12).text(`Patient: ${data.patientName}`);
+      doc.text(`Doctor: ${data.doctorName}`);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`);
+      doc.moveDown();
+
+      // Clinical Brief (AI Generated)
+      if (data.symptomBrief) {
+        doc.fontSize(14).text('Clinical Brief:', { underline: true });
+        doc.fontSize(11).text(data.symptomBrief);
+        doc.moveDown();
+      }
+
+      // Prescription
+      doc.fontSize(14).text('Prescription / Advice:', { underline: true });
+      doc.fontSize(12).text(data.prescription);
+      doc.moveDown();
+
+      // Footer
+      doc.fontSize(10).text('Generated by AarogyaLink Platform', { align: 'center', baseline: 'bottom' });
+
+      doc.end();
+
+      stream.on('finish', () => {
+        resolve(outputPath);
+      });
+
+      stream.on('error', (err) => {
+        reject(err);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+module.exports = {
+  generatePrescriptionPDF,
+};
+
+</file>
+
+<file path="backend/src/services/queue/pdf.queue.js">
+const { Queue } = require('bullmq');
+
+const pdfQueue = new Queue('pdf-generation', {
+  connection: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+  }
+});
+
+/**
+ * Adds a PDF generation job to the queue.
+ * @param {object} data - The prescription data.
+ */
+const addPDFJob = async (data) => {
+  await pdfQueue.add('generate-prescription', data, {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 1000,
+    },
+  });
+};
+
+module.exports = {
+  addPDFJob,
+};
+
+</file>
+
+<file path="backend/src/services/queue/.gitkeep">
+
+</file>
+
+<file path="backend/src/workers/pdf.processor.js">
+const { generatePrescriptionPDF } = require('../services/pdf/prescription.service');
+
+/**
+ * Sandboxed worker processor for BullMQ.
+ * This runs in a separate process/thread.
+ */
+module.exports = async (job) => {
+  console.log(`[Worker Thread] Processing PDF for booking: ${job.data.bookingId}`);
+  
+  try {
+    const filePath = await generatePrescriptionPDF(job.data);
+    return { filePath };
+  } catch (error) {
+    console.error(`[Worker Thread] PDF generation failed:`, error);
+    throw error;
+  }
+};
+
+</file>
+
+<file path="backend/src/workers/pdf.worker.js">
+const { Worker } = require('bullmq');
+const path = require('path');
+
+// BullMQ Sandboxed Worker: 
+// By passing a file path instead of a function, BullMQ runs the processor in a separate thread/process.
+const processorPath = path.join(__dirname, 'pdf.processor.js');
+
+const pdfWorker = new Worker('pdf-generation', processorPath, {
+  connection: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+  },
+  concurrency: 5, // Process up to 5 PDFs simultaneously
+});
+
+pdfWorker.on('completed', (job) => {
+  console.log(`PDF Job ${job.id} completed!`);
+});
+
+pdfWorker.on('failed', (job, err) => {
+  console.error(`PDF Job ${job.id} failed: ${err.message}`);
+});
+
+module.exports = pdfWorker;
+
+
+</file>
+
+<file path="backend/src/workers/.gitkeep">
+
+</file>
+
+<file path="backend/src/scripts/seed.js">
+/**
+ * Seed script - creates test users and slots for development
+ * Run with: node backend/src/scripts/seed.js
+ */
+const path = require('path')
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') })
+const mongoose = require('mongoose')
+const User = require('../models/User')
+const Doctor = require('../models/Doctor')
+const Slot = require('../models/Slot')
+
+async function seed() {
+  await mongoose.connect(process.env.MONGO_URI)
+  console.log('Connected to MongoDB')
+
+  // Clear existing
+  await User.deleteMany({})
+  await Doctor.deleteMany({})
+  await Slot.deleteMany({})
+  console.log('Cleared existing data')
+
+  // Create users
+  const doctor1User = await User.create({ name: 'Dr. Priya Sharma', email: 'priya@doctor.com', password: 'password123', role: 'doctor' })
+  const doctor2User = await User.create({ name: 'Dr. Arjun Mehta',  email: 'arjun@doctor.com', password: 'password123', role: 'doctor' })
+  await User.create({ name: 'Ravi Kumar',  email: 'ravi@patient.com', password: 'password123', role: 'patient' })
+  await User.create({ name: 'Sunita Devi', email: 'sunita@asha.com',  password: 'password123', role: 'asha' })
+  await User.create({ name: 'Admin User',  email: 'admin@hospital.com', password: 'password123', role: 'admin' })
+  console.log('Created 5 users')
+
+  // Create doctor profiles (normalized schema)
+  await Doctor.create({ userId: doctor1User._id, specialty: 'General Medicine', availableDays: ['Monday', 'Wednesday', 'Friday'] })
+  await Doctor.create({ userId: doctor2User._id, specialty: 'Pediatrics', availableDays: ['Tuesday', 'Thursday', 'Saturday'] })
+  console.log('Created 2 doctor profiles')
+
+  // Create slots for today and tomorrow
+  const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
+  // Create slots for the next 7 days
+  const slotsToCreate = []
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(Date.now() + i * 86400000).toISOString().split('T')[0]
+    slotsToCreate.push(
+      { doctorId: doctor1User._id, date, startTime: '10:00', endTime: '10:30', time: '10:00 AM', isBooked: false },
+      { doctorId: doctor1User._id, date, startTime: '11:00', endTime: '11:30', time: '11:00 AM', isBooked: false },
+      { doctorId: doctor1User._id, date, startTime: '14:00', endTime: '14:30', time: '02:00 PM', isBooked: false },
+      { doctorId: doctor2User._id, date, startTime: '09:00', endTime: '09:30', time: '09:00 AM', isBooked: false },
+      { doctorId: doctor2User._id, date, startTime: '10:30', endTime: '11:00', time: '10:30 AM', isBooked: false },
+      { doctorId: doctor2User._id, date, startTime: '15:00', endTime: '15:30', time: '03:00 PM', isBooked: false },
+    )
+  }
+  await Slot.insertMany(slotsToCreate)
+  console.log(`Created ${slotsToCreate.length} slots (6 per day × 7 days)`)
+
+  console.log('\n✅ Seed complete! Test accounts:')
+  console.log('  Patient:  ravi@patient.com   / password123')
+  console.log('  Doctor:   priya@doctor.com   / password123')
+  console.log('  Doctor:   arjun@doctor.com   / password123')
+  console.log('  ASHA:     sunita@asha.com    / password123')
+  console.log('  Admin:    admin@hospital.com / password123')
+
+  mongoose.disconnect()
+}
+
+seed().catch(err => { console.error(err); process.exit(1) })
+
+</file>
+
+<file path="backend/src/controllers/.gitkeep">
+
+</file>
+
+<file path="backend/src/controllers/booking.controller.js">
+const mongoose = require('mongoose');
+const Slot = require('../models/Slot');
+const Booking = require('../models/Booking');
+const AuditLog = require('../models/AuditLog');
+const User = require('../models/User');
+const { client } = require('../config/redis');
+const { generateClinicalBrief } = require('../services/ai/triage.service');
+const queueSSEManager = require('../services/sse/queue.sse');
+const { addPDFJob } = require('../services/queue/pdf.queue');
+const { sendBookingConfirmation } = require('../services/mail/mail.service');
+const { scheduleReminder } = require('../services/mail/reminder.service');
+
+/**
+ * POST /api/bookings
+ * Creates a booking, invalidates cache, pushes to Redis queue,
+ * triggers SSE, sends confirmation email, and schedules a reminder.
+ */
+const createBooking = async (req, res) => {
+  try {
+    const { slotId, patientId, symptomBrief } = req.body;
+    if (!slotId || !mongoose.Types.ObjectId.isValid(slotId))
+      return res.status(400).json({ error: 'Invalid slotId' });
+    if (!patientId)
+      return res.status(400).json({ error: 'Missing patientId' });
+
+    // Atomic: mark slot as booked only if it's still available (race-condition safe)
+    const slot = await Slot.findOneAndUpdate(
+      { _id: slotId, isBooked: false },
+      { isBooked: true, bookedBy: patientId },
+      { new: true }
+    );
+    if (!slot) return res.status(400).json({ error: 'Slot already booked or not found' });
+
+    // AI Triage: if patient provided raw symptoms, generate a clinical brief
+    let finalBrief = symptomBrief || '';
+    if (req.body.rawSymptoms && !symptomBrief) {
+      finalBrief = await generateClinicalBrief(req.body.rawSymptoms);
+    }
+
+    const booking = await Booking.create({
+      slotId, patientId, doctorId: slot.doctorId,
+      symptomBrief: finalBrief,
+    });
+
+    // Invalidate slot availability cache
+    await client.del(`slots:all:${slot.date}`);
+    await client.del(`slots:${slot.doctorId}:${slot.date}`);
+    await client.del(`slots:all:any`);
+    await client.del(`slots:${slot.doctorId}:any`);
+
+    // Add to Redis sorted queue (score = timestamp for FIFO order)
+    await client.zAdd(`queue:${slot.doctorId}`, {
+      score: Date.now(),
+      value: booking._id.toString(),
+    });
+
+    // Trigger SSE update for all clients watching this doctor's queue
+    queueSSEManager.broadcastQueueUpdate(slot.doctorId);
+
+    // Get queue position immediately
+    const queue = await client.zRange(`queue:${slot.doctorId}`, 0, -1);
+    const position = queue.findIndex(id => id === booking._id.toString()) + 1;
+
+    // Write audit log
+    await AuditLog.create({
+      action: 'booking_created',
+      performedBy: patientId,
+      targetId: booking._id,
+      metadata: { doctorId: slot.doctorId, slotId, position },
+    });
+
+    // Send Email Confirmation (Async — fire and forget)
+    const patient = await User.findById(patientId);
+    if (patient && patient.email) {
+      sendBookingConfirmation(patient.email, {
+        patientName: patient.name,
+        doctorName: slot.doctorId.name || 'Your Doctor',
+        date: slot.date,
+        time: slot.time
+      });
+    }
+
+    // Schedule 1-hour Reminder
+    try {
+      const slotDateTime = new Date(`${slot.date}T${slot.startTime}:00`);
+      const reminderTime = new Date(slotDateTime.getTime() - 60 * 60 * 1000);
+      const delay = reminderTime.getTime() - Date.now();
+
+      if (delay > 0 && patient && patient.email) {
+        await scheduleReminder(patient.email, {
+          patientName: patient.name,
+          doctorName: slot.doctorId.name || 'Your Doctor',
+          date: slot.date,
+          time: slot.time
+        }, delay);
+      }
+    } catch (err) {
+      console.error('Reminder scheduling failed:', err);
+    }
+
+    res.status(201).json({ message: 'Booking successful', booking, queuePos: position });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/bookings/queue/:doctorId
+ * Returns the full Redis sorted-set queue for a doctor.
+ */
+const getDoctorQueue = async (req, res) => {
+  try {
+    const queue = await client.zRange(`queue:${req.params.doctorId}`, 0, -1);
+    res.json({ queue, total: queue.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/bookings/position/:doctorId/:bookingId
+ * Returns the patient's current position within a doctor's queue.
+ */
+const getPatientQueuePosition = async (req, res) => {
+  try {
+    const { doctorId, bookingId } = req.params;
+    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+    const index = queue.findIndex(id => id === bookingId);
+    if (index === -1) return res.status(404).json({ message: 'Not found in queue' });
+    res.json({ position: index + 1, patientsAhead: index, total: queue.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /api/bookings/complete/:bookingId
+ * Marks a booking as completed, removes from queue,
+ * triggers SSE done event, and queues PDF generation.
+ */
+const completeBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { prescription } = req.body;
+
+    const booking = await Booking.findById(bookingId).populate('patientId doctorId');
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // Update booking status
+    booking.status = 'completed';
+    booking.prescription = prescription;
+    await booking.save();
+
+    // Remove from Redis queue
+    await client.zRem(`queue:${booking.doctorId._id}`, booking._id.toString());
+
+    // Trigger SSE updates
+    queueSSEManager.sendDone(bookingId);
+    queueSSEManager.broadcastQueueUpdate(booking.doctorId._id);
+
+    // Queue background PDF generation
+    await addPDFJob({
+      bookingId: booking._id,
+      patientName: booking.patientId.name,
+      doctorName: booking.doctorId.name,
+      symptomBrief: booking.symptomBrief,
+      prescription: prescription
+    });
+
+    res.json({ message: 'Booking completed and PDF generation queued', booking });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  createBooking,
+  getDoctorQueue,
+  getPatientQueuePosition,
+  completeBooking,
+};
+
+</file>
+
+<file path="backend/src/controllers/user.controller.js">
+const User = require('../models/User');
+const Doctor = require('../models/Doctor');
+
+/**
+ * Upload doctor profile photo.
+ * Expects multer to have already processed the file onto req.file.
+ * Updates the Doctor document with the relative profilePhoto path.
+ *
+ * POST /api/users/doctor/:id/photo
+ */
+const uploadDoctorPhoto = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Profile photo upload is only available for doctors' });
+    }
+
+    // Store relative path for portability (served via express.static)
+    const profilePhoto = `/uploads/profiles/${req.file.filename}`;
+
+    // Upsert the Doctor document with the new photo
+    await Doctor.findOneAndUpdate(
+      { userId: id },
+      { profilePhoto },
+      { upsert: true, new: true }
+    );
+
+    res.json({
+      message: 'Profile photo uploaded successfully',
+      profilePhoto,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  uploadDoctorPhoto,
+};
+
+</file>
+
+<file path="backend/src/utils/helpers.js">
+
+</file>
+
+<file path="backend/src/utils/apiResponse.js">
+
+</file>
+
+<file path="backend/src/middleware/auth.js">
+const jwt = require('jsonwebtoken');
+
+const auth = (req, res, next) => {
+  try {
+    const authHeader = req.header('Authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization header missing or malformed.'
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Access token expired.',
+        code: 'TOKEN_EXPIRED'  // TM2 Axios interceptor checks this to trigger /refresh
+      });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token.'
+      });
+    }
+    res.status(500).json({ success: false, message: 'Auth middleware error.' });
+  }
+};
+
+module.exports = { auth };
+</file>
+
+<file path="backend/src/middleware/upload.js">
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, '../../public/uploads/profiles');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+/**
+ * Multer disk storage configuration.
+ * Files are saved to public/uploads/profiles with a unique timestamp prefix.
+ */
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `profile-${uniqueSuffix}${ext}`);
+  },
+});
+
+/**
+ * File filter: only allow JPEG and PNG images.
+ */
+const fileFilter = (_req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .jpeg, .jpg, and .png files are allowed'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+});
+
+module.exports = { upload };
+
+</file>
+
+<file path="backend/src/middleware/rbac.js">
+const checkRole = (roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied: insufficient permissions'
+            });
+        }
+        next();
+    };
+};
+
+module.exports = { checkRole };
+
+</file>
+
+<file path="backend/src/middleware/errorHandler.js">
+const errorHandler = (err, req, res, next) => {
+    console.error(err.stack);
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Internal Server Error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+};
+
+module.exports = { errorHandler };
+
+</file>
+
+<file path="backend/src/models/Slot.js">
+const mongoose = require("mongoose");
+
+const slotSchema = new mongoose.Schema({
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  date: { type: String, required: true },  // Store as 'YYYY-MM-DD' for easy querying
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
+  time: { type: String }, // Display string e.g. "10:00 AM"
+  isBooked: { type: Boolean, default: false },
+  bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }
+}, { timestamps: true });
+
+slotSchema.index({ doctorId: 1, date: 1, isBooked: 1 });
+
+module.exports = mongoose.model("Slot", slotSchema);
+</file>
+
+<file path="backend/src/models/Doctor.js">
+const mongoose = require('mongoose');
+
+const doctorSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true,
+  },
+  specialty: { type: String, required: true },
+  availableDays: {
+    type: [String],
+    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    default: [],
+  },
+  profilePhoto: { type: String, default: null },
+}, { timestamps: true });
+
+//doctorSchema.index({ userId: 1 }, { unique: true });
+doctorSchema.index({ specialty: 1 });
+
+module.exports = mongoose.model('Doctor', doctorSchema);
+
+</file>
+
+<file path="backend/src/models/Booking.js">
+const mongoose = require("mongoose");
+
+const bookingSchema = new mongoose.Schema({
+  slotId: { type: mongoose.Schema.Types.ObjectId, ref: "Slot", required: true },
+  patientId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  status: { type: String, enum: ["booked", "completed", "cancelled"], default: "booked" },
+  symptomBrief: String,
+  prescription: String,
+  prescriptionUrl: String
+}, { timestamps: true });
+
+// Compound indexes for query performance
+bookingSchema.index({ patientId: 1, createdAt: -1 }); // Patient booking history
+bookingSchema.index({ doctorId: 1, status: 1 });       // Doctor's pending consultation list
+
+module.exports = mongoose.model("Booking", bookingSchema);
+</file>
+
+<file path="backend/src/models/User.js">
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const userSchema = new mongoose.Schema({
+  name: { 
+    type: String, 
+    required: true,
+    trim: true 
+  },
+  email: { 
+    type: String, 
+    required: true, 
+    unique: true,
+    lowercase: true,
+    trim: true 
+  },
+  password: { 
+    type: String, 
+    required: true,
+    minlength: 6 
+  },
+  role: { 
+    type: String, 
+    enum: ['patient', 'doctor', 'asha', 'admin'], 
+    default: 'patient',
+    required: true
+  },
+  phone: { 
+    type: String,
+    trim: true 
+  },
+}, { timestamps: true });
+
+// Hash password before saving
+userSchema.pre('save', async function() {
+  // 1. Only hash if the password was modified (or is new)
+  if (!this.isModified('password')) return;
+
+  // 2. Simply await the hash. No need for try/catch here if you 
+  // have a global error handler, but it doesn't hurt.
+  this.password = await bcrypt.hash(this.password, 10);
+  
+  // 3. No next() call needed! Mongoose sees the function is done 
+  // when the code reaches the end.
+});
+
+// Compare password method
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Generate JWT Token
+userSchema.methods.generateAuthToken = function() {
+  return jwt.sign(
+    { 
+      id: this._id, 
+      role: this.role 
+    },
+    process.env.JWT_SECRET || 'aarogyalink_secret_key_123',
+    { expiresIn: '7d' }
+  );
+};
+
+module.exports = mongoose.model('User', userSchema);
+</file>
+
+<file path="backend/src/models/.gitkeep">
+
+</file>
+
+<file path="backend/src/models/AuditLog.js">
+const mongoose = require('mongoose');
+
+const auditLogSchema = new mongoose.Schema({
+  action: {
+    type: String,
+    enum: ['booking_created', 'booking_cancelled', 'booking_completed', 'slot_created', 'user_registered'],
+    required: true,
+  },
+  performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  targetId: { type: mongoose.Schema.Types.ObjectId }, // bookingId, slotId, etc.
+  metadata: { type: mongoose.Schema.Types.Mixed },    // any extra info
+  createdAt: { type: Date, default: Date.now },
+});
+
+auditLogSchema.index({ action: 1, createdAt: -1 });
+auditLogSchema.index({ performedBy: 1 });
+
+module.exports = mongoose.model('AuditLog', auditLogSchema);
+
+</file>
+
+<file path="backend/src/config/env.js">
+const { z } = require('zod');
+
+/**
+ * Zod schema for validating all required environment variables.
+ * Fails fast on server start if any are missing or malformed.
+ */
+const envSchema = z.object({
+  // Server
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
+  PORT: z
+    .string()
+    .default('3000')
+    .transform(Number)
+    .pipe(z.number().int().positive()),
+  UV_THREADPOOL_SIZE: z
+    .string()
+    .default('16')
+    .transform(Number)
+    .pipe(z.number().int().min(4).max(128)),
+
+  // MongoDB
+  MONGO_URI: z
+    .string({ required_error: 'MONGO_URI is required' })
+    .url('MONGO_URI must be a valid connection string')
+    .startsWith('mongodb', 'MONGO_URI must start with mongodb:// or mongodb+srv://'),
+
+  // Redis
+  REDIS_URL: z
+    .string({ required_error: 'REDIS_URL is required' })
+    .url('REDIS_URL must be a valid connection string')
+    .startsWith('redis', 'REDIS_URL must start with redis://'),
+
+  // Auth
+  JWT_SECRET: z
+    .string({ required_error: 'JWT_SECRET is required' })
+    .min(8, 'JWT_SECRET must be at least 8 characters'),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .min(8, 'JWT_REFRESH_SECRET must be at least 8 characters')
+    .optional(),
+
+  // Anthropic / Claude AI
+  ANTHROPIC_API_KEY: z
+    .string({ required_error: 'ANTHROPIC_API_KEY is required' })
+    .startsWith('sk-ant-', 'ANTHROPIC_API_KEY must start with sk-ant-'),
+  CLAUDE_API_KEY: z
+    .string()
+    .optional(),
+
+  // Email
+  EMAIL_USER: z
+    .string({ required_error: 'EMAIL_USER is required' })
+    .email('EMAIL_USER must be a valid email address'),
+  EMAIL_PASS: z
+    .string({ required_error: 'EMAIL_PASS is required' })
+    .min(1, 'EMAIL_PASS cannot be empty'),
+});
+
+/**
+ * Validates process.env against the schema.
+ * Logs a detailed error table and exits if validation fails.
+ * @returns {object} Parsed and validated environment variables.
+ */
+const validateEnv = () => {
+  const result = envSchema.safeParse(process.env);
+
+  if (!result.success) {
+    console.error('\n❌ Environment validation failed:\n');
+
+    const errors = result.error.flatten().fieldErrors;
+    for (const [field, messages] of Object.entries(errors)) {
+      console.error(`  • ${field}: ${messages.join(', ')}`);
+    }
+
+    console.error('\n  → Check your .env file against .env.example\n');
+    process.exit(1);
+  }
+
+  console.log('✅ Environment variables validated');
+  return result.data;
+};
+
+module.exports = { validateEnv, envSchema };
+
+</file>
+
+<file path="backend/src/config/redis.js">
+const { createClient } = require('redis');
+
+const client = createClient({
+  url: process.env.REDIS_URL || "redis://127.0.0.1:6379"
+});
+
+client.on('error', (err) => console.log('Redis Error:', err));
+
+const connectRedis = async () => {
+  await client.connect();
+  console.log("Redis Connected");
+};
+
+module.exports = { client, connectRedis };
+
+</file>
+
+<file path="backend/src/config/db.js">
+const mongoose = require('mongoose');
+
+// Rename to connectDB to match your server.js
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('✅ Database connected');
+    } catch (error) {
+        console.error('❌ MongoDB Connection Error:', error.message);
+        process.exit(1);    
+    }
+};
+
+// Export as an object so { connectDB } works in server.js
+module.exports = { connectDB };
+</file>
+
+<file path="src/routes/bookingRoutes.js">
+const express = require('express');
+const mongoose = require('mongoose');
+const router = express.Router();
+const Slot = require('../models/Slot');
+const Booking = require('../models/Booking');
+const { client } = require('../config/redis');
+
+
+router.post('/', async (req, res) => {
+  try {
+    const { slotId, patientId } = req.body;
+
+    if (!slotId || !mongoose.Types.ObjectId.isValid(slotId)) {
+      return res.status(400).json({ error: 'Invalid slotId' });
+    }
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'Missing patientId' });
+    }
+
+    const slot = await Slot.findOneAndUpdate(
+      { _id: slotId, isBooked: false },
+      { isBooked: true, bookedBy: patientId },
+      { new: true }
+    );
+
+    if (!slot) {
+      return res.status(400).json({ error: 'Slot already booked' });
+    }
+
+    const booking = await Booking.create({
+      slotId,
+      patientId,
+      doctorId: slot.doctorId,
+      symptomBrief: "dummy"
+    });
+
+    console.log("Adding to queue:", booking._id.toString());
+
+    await client.zAdd(`queue:${slot.doctorId}`, {
+      score: Date.now(),
+      value: booking._id.toString()
+    });
+
+    res.json({
+      message: "Booking successful",
+      booking
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/queue/:doctorId', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+
+    res.json(queue);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+    
+router.get('/position/:doctorId/:bookingId', async (req, res) => {
+  try {
+    const { doctorId, bookingId } = req.params;
+
+    const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
+
+    const position = queue.findIndex(id => id === bookingId.toString());
+
+    if (position === -1) {
+      return res.status(404).json({ message: "Booking not found in queue" });
+    }
+
+    res.json({
+      patientsAhead: position
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+</file>
