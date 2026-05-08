@@ -1,0 +1,16 @@
+const express = require('express');
+const router = express.Router();
+const { generatePrescription } = require('../controllers/prescription.controller');
+
+/**
+ * POST /api/prescriptions
+ * Manually trigger PDF prescription generation for a completed booking.
+ *
+ * Body: { bookingId: "<ObjectId>" }
+ * Response: 202 Accepted  →  PDF is generated in background via worker_threads
+ *
+ * Teammate 3 (Infrastructure)
+ */
+router.post('/', generatePrescription);
+
+module.exports = router;
