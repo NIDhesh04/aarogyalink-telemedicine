@@ -7,22 +7,26 @@ const {
   getDoctorQueue,
   getPatientQueuePosition,
   completeBooking,
+  getPatientBookings,
+  getAIPrescriptionSuggestion,
 } = require('../controllers/booking.controller');
 
-// ─── POST /api/bookings ───────────────────────────────────────────────────────
-// Only patients and ASHA workers can create bookings
+// ─── GET /api/bookings?patientId=xxx ─── Patient only ────────────────────────
+router.get('/', auth, checkRole(['patient', 'asha', 'admin']), getPatientBookings);
+
+// ─── POST /api/bookings ─── Patient or ASHA ───────────────────────────────────
 router.post('/', auth, checkRole(['patient', 'asha']), createBooking);
 
-// ─── GET /api/bookings/queue/:doctorId ────────────────────────────────────────
-// Only doctors and admins can view the full queue
+// ─── POST /api/bookings/ai-suggest ─── Doctor only ───────────────────────────
+router.post('/ai-suggest', auth, checkRole(['doctor']), getAIPrescriptionSuggestion);
+
+// ─── GET /api/bookings/queue/:doctorId ─── Doctor or Admin ───────────────────
 router.get('/queue/:doctorId', auth, checkRole(['doctor', 'admin']), getDoctorQueue);
 
-// ─── GET /api/bookings/position/:doctorId/:bookingId ─────────────────────────
-// Any authenticated user can check a queue position
-router.get('/position/:doctorId/:bookingId', auth, getPatientQueuePosition);
+// ─── GET /api/bookings/position/:doctorId/:bookingId ─── Patient or ASHA ─────
+router.get('/position/:doctorId/:bookingId', auth, checkRole(['patient', 'asha']), getPatientQueuePosition);
 
-// ─── POST /api/bookings/complete/:bookingId ──────────────────────────────────
-// Only doctors can complete a booking (triggers PDF generation)
+// ─── POST /api/bookings/complete/:bookingId ─── Doctor only ──────────────────
 router.post('/complete/:bookingId', auth, checkRole(['doctor']), completeBooking);
 
 module.exports = router;

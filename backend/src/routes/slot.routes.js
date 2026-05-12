@@ -6,7 +6,7 @@ const { auth } = require('../middleware/auth');
 const { checkRole } = require('../middleware/rbac');
 
 
-// Create a slot (doctor/admin use)
+// Create a slot — Doctor or Admin only
 router.post('/', auth, checkRole(['doctor', 'admin']), async (req, res) => {
   try {
     const slot = await Slot.create(req.body);
@@ -55,7 +55,22 @@ router.get('/doctor/:doctorId', auth, async (req, res) => {
     const slots = await Slot.find(filter)
       .populate('doctorId', 'name specialty')
       .populate('bookedBy', 'name')
-      .sort({ startTime: 1 });
+      .sort({ startTime: 1 })
+      .lean();
+      
+    // Attach booking data so doctor sees AI brief and can complete the session
+    const Booking = require('../models/Booking');
+    for (let slot of slots) {
+      if (slot.isBooked) {
+        const booking = await Booking.findOne({ slotId: slot._id }).sort({ createdAt: -1 });
+        if (booking) {
+          slot.bookingId = booking._id;
+          slot.symptomBrief = booking.symptomBrief;
+          slot.bookingStatus = booking.status; // 'booked', 'completed'
+        }
+      }
+    }
+    
     res.json(slots);
   } catch (err) {
     res.status(500).json({ error: err.message });

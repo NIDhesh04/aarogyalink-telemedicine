@@ -24,7 +24,9 @@ const { errorHandler } = require('./middleware/errorHandler');
 app.use(helmet());                          // Security headers (CSP, HSTS, X-Frame, etc.)
 app.use(morgan('dev'));                      // HTTP request logging (colored status codes)
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    origin: function (origin, callback) {
+        callback(null, true); // Allow all origins for local development
+    },
     credentials: true
 }));
 app.use(express.json());

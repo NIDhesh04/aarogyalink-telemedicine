@@ -8,7 +8,7 @@ const { connectRedis } = require('./config/redis'); // Added this
 // Import workers to handle background PDF tasks
 require('./workers/pdf.worker'); 
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5005;
 
 // 2. The "Master Startup" Function
 const startServer = async () => {

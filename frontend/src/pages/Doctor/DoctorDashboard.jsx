@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import Navbar from '../../components/Navbar'
+import { motion, AnimatePresence } from 'framer-motion'
+import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
-import '../dashboard.css'
+import { Calendar, CheckCircle2, Clock, User as UserIcon, AlertCircle, PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2 } from 'lucide-react'
 
 const STATUS_MAP = {
-  pending:   { bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b', label: 'Open' },
-  completed: { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', label: 'Done' },
-  cancelled: { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', label: 'Cancelled' },
-  booked:    { bg: 'rgba(13,148,136,0.1)',  color: '#0d9488', label: 'Booked' },
+  pending:   { bg: 'bg-amber-100',  color: 'text-amber-600', label: 'Open' },
+  completed: { bg: 'bg-emerald-100',  color: 'text-emerald-600', label: 'Done' },
+  cancelled: { bg: 'bg-red-100',   color: 'text-red-600', label: 'Cancelled' },
+  booked:    { bg: 'bg-teal-100',  color: 'text-teal-600', label: 'Booked' },
 }
 
 const TIME_OPTIONS = [
@@ -20,7 +21,7 @@ const TIME_OPTIONS = [
 export default function DoctorDashboard() {
   const { user } = useAuth()
   const [tab, setTab] = useState('schedule') // 'schedule' | 'add'
-  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0])
+  const [viewDate, setViewDate] = useState(() => new Date().toISOString().split('T')[0])
   const [slots, setSlots] = useState([])
   const [selected, setSelected] = useState(null)
   const [prescription, setPrescription] = useState('')
@@ -32,6 +33,7 @@ export default function DoctorDashboard() {
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
   const [addSuccess, setAddSuccess] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -60,7 +62,6 @@ export default function DoctorDashboard() {
       })
       setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
       setNewSlot({ date: '', time: '' })
-      // Refresh if viewing same date
       if (viewDate === newSlot.date) fetchSlots(viewDate)
     } catch (err) {
       setAddError(err.response?.data?.error || 'Failed to add slot')
@@ -75,234 +76,303 @@ export default function DoctorDashboard() {
     done:    slots.filter(s => s.isBooked).length,
   }
 
+  const StatCard = ({ icon: Icon, value, label, colorClass, delay }) => (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
+      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow"
+    >
+      <div className={`p-4 rounded-xl ${colorClass}`}>
+        <Icon size={28} />
+      </div>
+      <div>
+        <div className="text-3xl font-bold text-slate-800">{value}</div>
+        <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{label}</div>
+      </div>
+    </motion.div>
+  )
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--surface)' }}>
-      <Navbar />
-      <div className="page-wrapper">
-        {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 'clamp(22px, 4vw, 28px)', fontWeight: 700, marginBottom: 4 }}>
-            {user?.name ?? 'Doctor'}
-          </h1>
-          <p style={{ color: 'var(--text-light)', fontSize: 15 }}>
-            {user?.specialty ?? 'Specialist'} · Manage your schedule
-          </p>
-        </div>
+    <DashboardLayout 
+      title={`Welcome, ${user?.name ?? 'Doctor'} 👋`}
+      subtitle={`${user?.specialty ?? 'Specialist'} · Manage your schedule and patient consultations`}
+    >
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard icon={Calendar} value={stats.total} label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-primary/10 text-[#0284c7]" delay={0.1} />
+        <StatCard icon={Clock} value={stats.pending} label="Open Slots" colorClass="bg-amber-100 text-amber-600" delay={0.2} />
+        <StatCard icon={CheckCircle2} value={stats.done} label="Booked / Done" colorClass="bg-emerald-100 text-emerald-600" delay={0.3} />
+      </div>
 
-        {/* Stats */}
-        <div className="stats-grid">
-          {[
-            { icon: '📋', label: `Slots on ${viewDate === today ? 'Today' : viewDate}`, value: stats.total,   color: '#8b5cf6' },
-            { icon: '⏳', label: 'Open Slots',   value: stats.pending, color: '#f59e0b' },
-            { icon: '✅', label: 'Booked',        value: stats.done,    color: '#10b981' },
-          ].map(s => (
-            <div key={s.label} className="stat-card">
-              <div className="stat-icon" style={{ background: `${s.color}18` }}>{s.icon}</div>
-              <div><div className="stat-value">{s.value}</div><div className="stat-label">{s.label}</div></div>
-            </div>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex bg-slate-200/50 p-1.5 rounded-xl mb-8 w-fit">
+        {[['schedule', 'My Schedule'], ['add', 'Add Slots']].map(([key, label]) => (
+          <button 
+            key={key} 
+            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${tab === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            onClick={() => setTab(key)}
+          >
+            {key === 'add' && <PlusCircle size={16} />}
+            {key === 'schedule' && <Calendar size={16} />}
+            {label}
+          </button>
+        ))}
+      </div>
 
-        {/* Tabs */}
-        <div className="tab-bar" style={{ marginBottom: 24 }}>
-          {[['schedule', 'My Schedule'], ['add', '+ Add Slot']].map(([key, label]) => (
-            <button key={key} className={`tab-btn ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
-              {label}
-            </button>
-          ))}
-        </div>
-
+      <AnimatePresence mode="wait">
         {tab === 'add' && (
-          <div className="card" style={{ maxWidth: 480, marginBottom: 32 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Add Availability Slot</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 20 }}>
-              Patients will be able to book these slots once you add them.
-            </p>
-            <form onSubmit={handleAddSlot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className="field-label">Date</label>
+          <motion.div 
+            key="add" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+            className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 max-w-lg"
+          >
+            <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <PlusCircle className="text-[#0284c7]" size={24} /> Add Availability Slot
+            </h3>
+            <p className="text-sm font-medium text-slate-500 mb-8">Patients will be able to book these slots once you add them.</p>
+
+            <form onSubmit={handleAddSlot} className="space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Date</label>
                 <input
-                  type="date"
-                  required
-                  min={today}
-                  value={newSlot.date}
-                  onChange={e => setNewSlot({ ...newSlot, date: e.target.value })}
-                  className="field-input"
-                  style={{ marginBottom: 0 }}
+                  type="date" required min={today}
+                  value={newSlot.date} onChange={e => setNewSlot({ ...newSlot, date: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700"
                 />
               </div>
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className="field-label">Time Slot</label>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Time Slot</label>
                 <select
-                  required
-                  value={newSlot.time}
-                  onChange={e => setNewSlot({ ...newSlot, time: e.target.value })}
-                  className="field-input"
-                  style={{ marginBottom: 0 }}
+                  required value={newSlot.time} onChange={e => setNewSlot({ ...newSlot, time: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700"
                 >
                   <option value="">Select a time...</option>
                   {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              {addError   && <p className="error-msg">{addError}</p>}
-              {addSuccess && <p style={{ color: '#10b981', fontSize: 13 }}>{addSuccess}</p>}
-              <button type="submit" className="btn-book" disabled={adding} style={{ background: '#8b5cf6' }}>
+
+              {addError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">
+                  <AlertCircle size={16} /> <p>{addError}</p>
+                </div>
+              )}
+              {addSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-600 text-sm font-medium rounded-lg border border-emerald-100">
+                  <CheckCircle2 size={16} /> <p>{addSuccess}</p>
+                </div>
+              )}
+
+              <button
+                type="submit" disabled={adding}
+                className={`w-full mt-2 py-4 rounded-xl font-bold text-white shadow-md flex items-center justify-center transition-all ${adding ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-[#075985] hover:bg-[#0369a1]'}`}
+              >
                 {adding ? 'Adding...' : 'Add Slot'}
               </button>
             </form>
-          </div>
+          </motion.div>
         )}
 
         {tab === 'schedule' && (
-        <div className="booking-grid">
-          {/* Schedule list */}
-          <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Schedule</h3>
-              <input
-                type="date"
-                value={viewDate}
-                onChange={e => { setViewDate(e.target.value); setSelected(null) }}
-                style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-dark)', background: 'var(--surface)' }}
-              />
-            </div>
-
-            {loading ? (
-              <p className="loading-msg">Loading schedule...</p>
-            ) : slots.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center' }}>
-                <p className="loading-msg" style={{ marginBottom: 8 }}>No slots on this date.</p>
-                <button className="btn-book" style={{ width: 'auto', padding: '8px 16px', fontSize: 13, background: '#8b5cf6' }} onClick={() => setTab('add')}>
-                  + Add a Slot
-                </button>
+          <motion.div 
+            key="schedule" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+          >
+            {/* Left Panel: Slot List */}
+            <div className="lg:col-span-5 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col max-h-[600px]">
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-slate-800">Schedule</h3>
+                <input
+                  type="date" value={viewDate} onChange={e => { setViewDate(e.target.value); setSelected(null) }}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50"
+                />
               </div>
-            ) : (
-              slots.map((slot, i) => {
-                const status = slot.isBooked ? 'booked' : 'pending'
-                const s = STATUS_MAP[status]
-                return (
-                  <div
-                    key={slot._id}
-                    onClick={() => { setSelected(slot); setPrescription('') }}
-                    style={{
-                      padding: '16px 24px', cursor: 'pointer',
-                      borderBottom: i < slots.length - 1 ? '1px solid var(--border)' : 'none',
-                      background: selected?._id === slot._id ? 'rgba(139,92,246,0.04)' : 'white',
-                      borderLeft: selected?._id === slot._id ? '3px solid #8b5cf6' : '3px solid transparent',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(139,92,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧑‍⚕️</div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>
-                            {slot.bookedBy?.name ?? (slot.isBooked ? 'Patient' : 'Open Slot')}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>
-                            {slot.time ?? slot.startTime} {slot.endTime ? `– ${slot.endTime}` : ''}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="status-badge" style={{ background: s.bg, color: s.color }}>{s.label}</span>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
 
-          {/* Detail / Prescription panel */}
-          <div className="card">
-            {!selected ? (
-              <div style={{ height: '100%', minHeight: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', gap: 12 }}>
-                <div style={{ fontSize: 48 }}>👈</div>
-                <p style={{ fontSize: 14 }}>Select a slot to view details</p>
-              </div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-                  <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 600 }}>
-                      {selected.bookedBy?.name ?? 'Open Slot'}
-                    </h3>
-                    <p style={{ fontSize: 13, color: 'var(--text-light)' }}>
-                      {selected.time ?? selected.startTime}
-                    </p>
-                  </div>
-                  <span className="status-badge" style={{
-                    background: STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].bg,
-                    color: STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].color,
-                  }}>
-                    {STATUS_MAP[selected.isBooked ? 'booked' : 'pending'].label}
-                  </span>
-                </div>
-
-                {/* AI Symptom Brief */}
-                {selected.symptomBrief && (
-                  <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span>✨</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#8b5cf6' }}>AI Symptom Brief</span>
-                    </div>
-                    <p style={{ fontSize: 14, color: 'var(--text-dark)', lineHeight: 1.6 }}>{selected.symptomBrief}</p>
-                  </div>
-                )}
-
-                {/* Prescription */}
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dark)', display: 'block', marginBottom: 8 }}>
-                  Write Prescription
-                </label>
-                {saved[selected._id] ? (
-                  <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '12px 14px', fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
-                    {saved[selected._id]}
+              <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                {loading ? (
+                   <div className="flex flex-col justify-center items-center h-48 space-y-3">
+                     <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                     <p className="text-sm font-medium text-slate-500">Loading schedule...</p>
+                   </div>
+                ) : slots.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+                    <Calendar size={32} className="text-slate-300 mb-3" />
+                    <p className="text-sm font-medium text-slate-500 mb-4">No slots scheduled on this date.</p>
+                    <button className="px-4 py-2 bg-primary/10 text-[#0284c7] font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors" onClick={() => setTab('add')}>
+                      + Add a Slot
+                    </button>
                   </div>
                 ) : (
-                  <textarea
-                    value={prescription}
-                    onChange={e => setPrescription(e.target.value)}
-                    placeholder={'Tab Paracetamol 500mg - twice daily for 3 days\nTab Cetirizine 10mg - once daily at night\nPlenty of fluids and rest...'}
-                    rows={5}
-                    className="field-input"
-                    style={{ marginBottom: 12 }}
-                  />
+                  slots.map((slot) => {
+                    const statusKey = slot.bookingStatus || (slot.isBooked ? 'booked' : 'pending')
+                    const s = STATUS_MAP[statusKey] || STATUS_MAP.pending
+                    const isSelected = selected?._id === slot._id
+
+                    return (
+                      <button
+                        key={slot._id}
+                        onClick={() => { setSelected(slot); setPrescription('') }}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${isSelected ? 'border-[#0284c7] bg-sky-50 shadow-sm ring-1 ring-[#0284c7]' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#0284c7] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            {slot.isBooked ? <UserIcon size={18} /> : <Clock size={18} />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm mb-0.5">
+                              {slot.bookedBy?.name ?? (slot.isBooked ? 'Patient' : 'Open Slot')}
+                            </div>
+                            <div className="text-xs font-medium text-slate-500">
+                              {slot.time ?? slot.startTime}
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${s.bg} ${s.color}`}>
+                          {s.label}
+                        </span>
+                      </button>
+                    )
+                  })
                 )}
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {!saved[selected._id] && (
-                    <button
-                      onClick={() => { if (prescription.trim()) setSaved(p => ({ ...p, [selected._id]: prescription })) }}
-                      className="btn-book"
-                      style={{ flex: 1, background: '#8b5cf6' }}
-                    >
-                      Save Prescription
-                    </button>
+              </div>
+            </div>
+
+            {/* Right Panel: Consultation Detail */}
+            <div className="lg:col-span-7 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full min-h-[500px]">
+              {!selected ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-slate-50/30">
+                  <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-4">
+                    <Activity size={32} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700 mb-2">No Consultation Selected</h3>
+                  <p className="text-sm font-medium text-slate-500 max-w-sm">Select a slot from your schedule on the left to view patient details and write prescriptions.</p>
+                </div>
+              ) : (
+                <div className="p-8 flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100">
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-800 mb-1">
+                        {selected.bookedBy?.name ?? 'Open Slot'}
+                      </h2>
+                      <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
+                        <Clock size={14} /> {selected.time ?? selected.startTime}
+                      </p>
+                    </div>
+                    {(() => {
+                      const sKey = selected.bookingStatus || (selected.isBooked ? 'booked' : 'pending')
+                      const s = STATUS_MAP[sKey] || STATUS_MAP.pending
+                      return (
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${s.bg} ${s.color}`}>
+                          {s.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
+
+                  {/* AI Brief */}
+                  {selected.symptomBrief && (
+                    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={18} className="text-[#0284c7]" />
+                        <span className="text-sm font-bold text-[#0284c7] tracking-wide uppercase">AI Symptom Brief</span>
+                      </div>
+                      <p className="text-slate-700 text-sm leading-relaxed font-medium">
+                        {selected.symptomBrief}
+                      </p>
+                    </div>
                   )}
-                  <button 
-                    onClick={async () => {
-                      if (!prescription.trim()) return;
-                      try {
-                        const bookingId = selected.bookingId || selected._id; // Adjust based on data structure
-                        await axiosInstance.post(`/bookings/complete/${bookingId}`, { prescription });
-                        setSaved(p => ({ ...p, [selected._id]: prescription }));
-                        alert('Prescription saved and PDF generation queued!');
-                      } catch (err) {
-                        alert('Failed to save prescription');
-                      }
-                    }}
-                    className="btn-book" 
-                    style={{ flex: 1 }}
-                    disabled={!prescription.trim() && !saved[selected._id]}
-                  >
-                    Complete &amp; Generate PDF
-                  </button>
+
+                  {/* Prescription Section */}
+                  {selected.isBooked && (
+                    <div className="flex flex-col flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                          <FileText size={16} className="text-slate-400" /> Write Prescription
+                        </h3>
+                        {selected.symptomBrief && !saved[selected._id] && (
+                          <button
+                            onClick={async () => {
+                              setAiLoading(true)
+                              try {
+                                const { data } = await axiosInstance.post('/bookings/ai-suggest', { symptomBrief: selected.symptomBrief })
+                                if (data.suggestion) setPrescription(data.suggestion)
+                              } catch (_) {}
+                              finally { setAiLoading(false) }
+                            }}
+                            disabled={aiLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-[#0284c7] hover:bg-primary/20 font-bold text-xs rounded-lg transition-colors"
+                          >
+                            {aiLoading ? (
+                              <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> Generating...</>
+                            ) : (
+                              <><Wand2 size={14} /> AI Assist</>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      
+                      {saved[selected._id] ? (
+                        <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-emerald-900 text-sm leading-relaxed whitespace-pre-wrap mb-6">
+                          {saved[selected._id]}
+                        </div>
+                      ) : (
+                        <textarea
+                          value={prescription}
+                          onChange={e => setPrescription(e.target.value)}
+                          placeholder="e.g. Tab Paracetamol 500mg - twice daily for 3 days&#10;Plenty of fluids and rest..."
+                          className="flex-1 w-full p-5 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700 resize-none mb-6 min-h-[150px]"
+                        />
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t border-slate-100">
+                        {!saved[selected._id] && (
+                          <button
+                            onClick={() => { if (prescription.trim()) setSaved(p => ({ ...p, [selected._id]: prescription })) }}
+                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            <CheckSquare size={18} /> Save Draft
+                          </button>
+                        )}
+                        
+                        <button 
+                          onClick={async () => {
+                            const currentPrescription = saved[selected._id] || prescription;
+                            if (!currentPrescription.trim()) return;
+                            try {
+                              const bookingId = selected.bookingId; 
+                              if (!bookingId) {
+                                alert('Error: This slot is missing its booking reference.');
+                                return;
+                              }
+                              await axiosInstance.post(`/bookings/complete/${bookingId}`, { prescription: currentPrescription });
+                              setSaved(p => ({ ...p, [selected._id]: currentPrescription }));
+                              // Refresh the slot view so the status updates to 'completed'
+                              fetchSlots(viewDate);
+                            } catch (err) {
+                              alert('Failed to complete consultation. Please try again.');
+                            }
+                          }}
+                          disabled={!prescription.trim() && !saved[selected._id]}
+                          className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${(!prescription.trim() && !saved[selected._id]) ? 'bg-slate-300 text-white cursor-not-allowed' : 'bg-[#075985] text-white shadow-sm'}`}
+                        >
+                          <FileText size={18} /> Complete &amp; Generate PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!selected.isBooked && (
+                     <div className="flex flex-col items-center justify-center flex-1 text-center opacity-60">
+                       <p className="text-sm font-medium text-slate-500">This slot is still open. Patients can book it from their dashboard.</p>
+                     </div>
+                  )}
 
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-        )} {/* end tab === 'schedule' */}
-      </div>
-    </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </DashboardLayout>
   )
 }
