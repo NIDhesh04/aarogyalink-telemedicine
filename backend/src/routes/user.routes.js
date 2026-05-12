@@ -3,9 +3,13 @@ const User = require('../models/User');
 const Doctor = require('../models/Doctor');
 const { upload } = require('../middleware/upload');
 const { uploadDoctorPhoto } = require('../controllers/user.controller');
+const { auth } = require('../middleware/auth');
+const { checkRole } = require('../middleware/rbac');
 const router = express.Router();
 
-// Get all doctors (join User + Doctor for specialty & photo)
+// ── GET /api/users/doctors ─────────────────────────────────────────────────
+// Returns all doctors (joins User + Doctor for specialty & photo).
+// Used by: Admin dashboard doctor roster, slot display in Patient/ASHA views.
 router.get('/doctors', async (req, res) => {
   try {
     const doctors = await Doctor.find()
@@ -17,7 +21,23 @@ router.get('/doctors', async (req, res) => {
   }
 });
 
-// Upload doctor profile photo
+// ── GET /api/users/patients ────────────────────────────────────────────────
+// Returns all users with role 'patient'.
+// Used by: ASHA dashboard to load the real caseload list for book-on-behalf.
+// Access: ASHA workers and Admins only (RBAC).
+router.get('/patients', auth, checkRole(['asha', 'admin']), async (req, res) => {
+  try {
+    const patients = await User.find({ role: 'patient' })
+      .select('name email phone role _id createdAt')
+      .sort({ createdAt: -1 });
+    res.json(patients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/users/doctor/:id/photo ──────────────────────────────────────
+// Multer multipart upload for doctor profile photo (TM3 — infrastructure).
 router.post('/doctor/:id/photo', upload.single('photo'), uploadDoctorPhoto);
 
 module.exports = router;

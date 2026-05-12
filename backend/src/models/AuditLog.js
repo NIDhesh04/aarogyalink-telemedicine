@@ -7,12 +7,19 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
   },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  targetId: { type: mongoose.Schema.Types.ObjectId }, // bookingId, slotId, etc.
-  metadata: { type: mongoose.Schema.Types.Mixed },    // any extra info
-  createdAt: { type: Date, default: Date.now },
+  bookingId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' }, // the booking this event relates to
+  targetId:    { type: mongoose.Schema.Types.ObjectId },  // generic target (slot, user, etc.)
+  metadata:    { type: mongoose.Schema.Types.Mixed },     // any extra info (doctorId, position, etc.)
+  createdAt:   { type: Date, default: Date.now },
+}, {
+  // Audit logs are append-only — never updated. Disable versionKey.
+  versionKey: false,
 });
 
-auditLogSchema.index({ action: 1, createdAt: -1 });
-auditLogSchema.index({ performedBy: 1 });
+// Compound indexes — verified with explain() in explain_results.md
+auditLogSchema.index({ bookingId: 1, createdAt: -1 });  // audit trail for a specific booking
+auditLogSchema.index({ action: 1, createdAt: -1 });     // admin action-type filter
+auditLogSchema.index({ performedBy: 1 });               // audit trail for a specific user
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);
+
