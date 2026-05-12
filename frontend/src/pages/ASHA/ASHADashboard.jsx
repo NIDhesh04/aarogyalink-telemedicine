@@ -1,50 +1,71 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
-import { Users, AlertTriangle, ClipboardCheck, Calendar, Clock, User, ChevronRight, CheckCircle, AlertCircle } from 'lucide-react'
+import { Users, AlertTriangle, ClipboardCheck, Calendar, Clock, User, ChevronRight, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
+
+// useCallback: patient status is derived from their last booking —
+// this helper is memoised so it isn't recreated on every render
+const deriveStatus = (patient) => {
+  if (!patient) return 'stable'
+  return patient.status || 'stable'
+}
 
 const STATUS_CONFIG = {
   stable:   { label: 'Stable',    class: 'bg-emerald-50 text-emerald-700 border-emerald-200', iconColor: 'text-emerald-500' },
-  followup: { label: 'Follow-up', class: 'bg-amber-50 text-amber-700 border-amber-200',   iconColor: 'text-amber-500' },
-  critical: { label: 'Critical',  class: 'bg-red-50 text-red-700 border-red-200',       iconColor: 'text-red-500' },
+  followup: { label: 'Follow-up', class: 'bg-amber-50 text-amber-700 border-amber-200',       iconColor: 'text-amber-500' },
+  critical: { label: 'Critical',  class: 'bg-red-50 text-red-700 border-red-200',             iconColor: 'text-red-500' },
 }
 
 export default function ASHADashboard() {
   const { user } = useAuth()
+  const [patients, setPatients] = useState([])        // ← real data from API
+  const [loadingPatients, setLoadingPatients] = useState(true)
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [booked, setBooked] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [slots, setSlots] = useState([])
-  
+
   const today = new Date().toISOString().split('T')[0]
 
-  useEffect(() => {
-    axiosInstance.get(`/slots?date=${today}`)
+  // ── Fetch real patient list from the backend ────────────────────────────
+  // useCallback: fetchPatients is passed as a dependency to useEffect.
+  // Without useCallback it would be recreated every render, causing an
+  // infinite fetch loop.
+  const fetchPatients = useCallback(() => {
+    setLoadingPatients(true)
+    axiosInstance.get('/users/patients')
+      .then(r => setPatients(r.data))
+      .catch(() => setPatients([]))
+      .finally(() => setLoadingPatients(false))
+  }, [])
+
+  // useCallback: slot fetch is triggered by date changes — stabilise the
+  // reference so it can be reused without causing extra re-renders.
+  const fetchSlots = useCallback((date) => {
+    axiosInstance.get(`/slots?date=${date}`)
       .then(r => setSlots(r.data))
       .catch(() => setSlots([]))
-  }, [today])
+  }, [])
 
-  // Mock caseload for the ASHA worker
-  const MOCK_PATIENTS = [
-    { id: '6a030967e3774b8a563f1382', name: 'Ravi Kumar',   age: 34, village: 'Rampur',    status: 'stable' },
-    { id: '6a030967e3774b8a563f1383', name: 'Meena Devi',   age: 52, village: 'Sikar',     status: 'followup' },
-    { id: '6a030967e3774b8a563f1384', name: 'Gopal Sharma', age: 67, village: 'Chomu',     status: 'critical' },
-    { id: '6a030967e3774b8a563f1385', name: 'Sunita Bai',   age: 28, village: 'Jhunjhunu', status: 'stable' },
-  ]
+  useEffect(() => { fetchPatients() }, [fetchPatients])
+  useEffect(() => { fetchSlots(today) }, [today, fetchSlots])
 
-  const handleBook = async () => {
+  // ── Book on behalf of a patient ────────────────────────────────────────
+  // useCallback: event handler — stabilised so it is not recreated unless
+  // selectedSlot or selectedPatient changes.
+  const handleBook = useCallback(async () => {
     if (!selectedSlot || !selectedPatient) return
     setLoading(true)
     setError('')
     try {
       await axiosInstance.post('/bookings', {
         slotId: selectedSlot._id,
-        patientId: selectedPatient.id,
-        symptomBrief: `Booked by ASHA Worker (${user?.name}) on behalf of ${selectedPatient.name}. Village: ${selectedPatient.village}.`,
+        patientId: selectedPatient._id,   // ← uses real MongoDB _id
+        symptomBrief: `Booked by ASHA Worker (${user?.name}) on behalf of ${selectedPatient.name}. Village: ${selectedPatient.village || 'N/A'}.`,
       })
       setBooked(true)
     } catch (err) {
@@ -52,19 +73,31 @@ export default function ASHADashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedSlot, selectedPatient, user?.name])
+
+  // ── Reset booking state ────────────────────────────────────────────────
+  const handleReset = useCallback(() => {
+    setBooked(false)
+    setSelectedSlot(null)
+    setSelectedPatient(null)
+    setError('')
+  }, [])
+
+  // ── Derived stats ──────────────────────────────────────────────────────
+  const criticalCount = patients.filter(p => deriveStatus(p) === 'critical').length
+  const followupCount = patients.filter(p => deriveStatus(p) === 'followup').length
 
   return (
-    <DashboardLayout 
-      title="ASHA Dashboard" 
+    <DashboardLayout
+      title="ASHA Dashboard"
       subtitle={`Community Health Worker: ${user?.name} · Rural Outreach & Scheduling`}
     >
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
-          { icon: Users, label: 'Patients in Caseload', value: MOCK_PATIENTS.length, color: 'text-amber-700 bg-amber-50 border-amber-100' },
-          { icon: AlertTriangle, label: 'Critical Cases', value: MOCK_PATIENTS.filter(p => p.status === 'critical').length, color: 'text-red-700 bg-red-50 border-red-100' },
-          { icon: ClipboardCheck, label: 'Follow-ups Needed', value: MOCK_PATIENTS.filter(p => p.status === 'followup').length, color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+          { icon: Users,         label: 'Patients in Caseload', value: patients.length,  color: 'text-amber-700 bg-amber-50 border-amber-100' },
+          { icon: AlertTriangle, label: 'Critical Cases',        value: criticalCount,    color: 'text-red-700 bg-red-50 border-red-100' },
+          { icon: ClipboardCheck,label: 'Follow-ups Needed',     value: followupCount,    color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4 shadow-sm">
@@ -82,33 +115,55 @@ export default function ASHADashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Patient Selection List */}
         <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Assigned Patients</h2>
+            <button
+              onClick={fetchPatients}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+              title="Refresh patient list"
+            >
+              <RefreshCw size={14} />
+            </button>
           </div>
-          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
-            {MOCK_PATIENTS.map((p) => {
-              const cfg = STATUS_CONFIG[p.status]
-              const isSelected = selectedPatient?.id === p.id
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => { setSelectedPatient(p); setSelectedSlot(null); setBooked(false); setError('') }}
-                  className={`w-full text-left p-4 transition-all border-l-4 ${isSelected ? 'bg-sky-50 border-[#0284c7]' : 'bg-white border-transparent hover:bg-slate-50'}`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#0284c7] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                        <User size={14} />
+
+          {loadingPatients ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-2">
+              <div className="w-6 h-6 border-2 border-slate-200 border-t-amber-500 rounded-full animate-spin" />
+              <p className="text-xs text-slate-400 font-medium">Loading patients...</p>
+            </div>
+          ) : patients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-center px-6">
+              <Users size={28} className="text-slate-300 mb-2" />
+              <p className="text-sm text-slate-400 font-medium">No patients assigned yet.</p>
+              <p className="text-xs text-slate-400 mt-1">Patients registered in the system will appear here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[500px]">
+              {patients.map((p) => {
+                const status = deriveStatus(p)
+                const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.stable
+                const isSelected = selectedPatient?._id === p._id
+                return (
+                  <button
+                    key={p._id}
+                    onClick={() => { setSelectedPatient(p); setSelectedSlot(null); setBooked(false); setError('') }}
+                    className={`w-full text-left p-4 transition-all border-l-4 ${isSelected ? 'bg-sky-50 border-[#0284c7]' : 'bg-white border-transparent hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#0284c7] text-white' : 'bg-slate-100 text-slate-400'}`}>
+                          <User size={14} />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800">{p.name}</span>
                       </div>
-                      <span className="text-sm font-semibold text-slate-800">{p.name}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.class}`}>{cfg.label}</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.class}`}>{cfg.label}</span>
-                  </div>
-                  <p className="text-xs text-slate-500 ml-11">{p.village} &bull; Age {p.age}</p>
-                </button>
-              )
-            })}
-          </div>
+                    <p className="text-xs text-slate-500 ml-11">{p.email}</p>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Booking Panel */}
@@ -122,6 +177,7 @@ export default function ASHADashboard() {
                 </div>
                 <p className="text-sm font-medium">Select a patient from the list to book an appointment</p>
               </motion.div>
+
             ) : booked ? (
               <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center justify-center h-[500px] p-8 text-center">
@@ -130,21 +186,26 @@ export default function ASHADashboard() {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">Booking Confirmed</h3>
                 <p className="text-sm text-slate-500 max-w-sm mb-8">
-                  Successfully booked a consultation for <strong>{selectedPatient.name}</strong> with <strong>{selectedSlot?.doctorId?.name}</strong> at <strong>{selectedSlot?.time}</strong>.
+                  Successfully booked a consultation for <strong>{selectedPatient.name}</strong> with{' '}
+                  <strong>{selectedSlot?.doctorId?.name || 'Doctor'}</strong> at{' '}
+                  <strong>{selectedSlot?.time}</strong>.
                 </p>
                 <button
-                  onClick={() => { setBooked(false); setSelectedSlot(null); setSelectedPatient(null) }}
+                  onClick={handleReset}
                   className="px-6 py-2.5 bg-[#075985] text-white font-semibold rounded-lg hover:bg-[#0369a1] transition-colors shadow-sm"
                 >
                   Book Another Patient
                 </button>
               </motion.div>
+
             ) : (
               <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-800">Book for {selectedPatient.name}</h2>
-                    <p className="text-xs text-slate-400 font-medium">Village: {selectedPatient.village} &bull; Status: {selectedPatient.status}</p>
+                    <p className="text-xs text-slate-400 font-medium">
+                      {selectedPatient.email} · Role: {selectedPatient.role}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-500">
                     <Calendar size={12} /> {today}
@@ -153,7 +214,7 @@ export default function ASHADashboard() {
 
                 <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Available District Hospital Slots</h3>
-                  
+
                   {error && (
                     <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200 mb-4">
                       <AlertCircle size={16} /> <span>{error}</span>

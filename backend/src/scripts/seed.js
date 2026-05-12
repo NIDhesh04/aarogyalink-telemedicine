@@ -22,10 +22,19 @@ async function seed() {
   // Create users
   const doctor1User = await User.create({ name: 'Dr. Priya Sharma', email: 'priya@doctor.com', password: 'password123', role: 'doctor' })
   const doctor2User = await User.create({ name: 'Dr. Arjun Mehta',  email: 'arjun@doctor.com', password: 'password123', role: 'doctor' })
-  await User.create({ name: 'Ravi Kumar',  email: 'ravi@patient.com', password: 'password123', role: 'patient' })
-  await User.create({ name: 'Sunita Devi', email: 'sunita@asha.com',  password: 'password123', role: 'asha' })
-  await User.create({ name: 'Admin User',  email: 'admin@hospital.com', password: 'password123', role: 'admin' })
-  console.log('Created 5 users')
+
+  // Patients — visible in the ASHA dashboard caseload
+  await User.create({ name: 'Ravi Kumar',     email: 'ravi@patient.com',    password: 'password123', role: 'patient' })
+  await User.create({ name: 'Meena Devi',     email: 'meena@patient.com',   password: 'password123', role: 'patient' })
+  await User.create({ name: 'Gopal Sharma',   email: 'gopal@patient.com',   password: 'password123', role: 'patient' })
+  await User.create({ name: 'Sunita Bai',     email: 'sunitab@patient.com', password: 'password123', role: 'patient' })
+  await User.create({ name: 'Ramesh Yadav',   email: 'ramesh@patient.com',  password: 'password123', role: 'patient' })
+  await User.create({ name: 'Kavita Singh',   email: 'kavita@patient.com',  password: 'password123', role: 'patient' })
+
+  // ASHA worker + Admin
+  await User.create({ name: 'Sunita Devi',  email: 'sunita@asha.com',     password: 'password123', role: 'asha' })
+  await User.create({ name: 'Admin User',   email: 'admin@hospital.com',  password: 'password123', role: 'admin' })
+  console.log('Created 10 users (2 doctors, 6 patients, 1 ASHA, 1 admin)')
 
   // Create doctor profiles (normalized schema)
   await Doctor.create({ userId: doctor1User._id, specialty: 'General Medicine', availableDays: ['Monday', 'Wednesday', 'Friday'] })
@@ -53,9 +62,11 @@ async function seed() {
   console.log(`Created ${slotsToCreate.length} slots (6 per day × 7 days)`)
 
   console.log('\n✅ Seed complete! Test accounts:')
-  console.log('  Patient:  ravi@patient.com   / password123')
-  console.log('  Doctor:   priya@doctor.com   / password123')
-  console.log('  Doctor:   arjun@doctor.com   / password123')
+  console.log('  Patients: ravi@patient.com, meena@patient.com, gopal@patient.com')
+  console.log('            sunitab@patient.com, ramesh@patient.com, kavita@patient.com')
+  console.log('            (all password: password123)')
+  console.log('  Doctor:   priya@doctor.com   / password123  → General Medicine')
+  console.log('  Doctor:   arjun@doctor.com   / password123  → Pediatrics')
   console.log('  ASHA:     sunita@asha.com    / password123')
   console.log('  Admin:    admin@hospital.com / password123')
 

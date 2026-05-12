@@ -1,118 +1,110 @@
-# UV_THREADPOOL_SIZE — Tuning Measurement & Analysis
-
-> Teammate 3 (Infrastructure) · AarogyaLink Telemedicine Project
-
----
-
-## 1. Background: How libuv Handles Async I/O
-
-Node.js is single-threaded for JavaScript execution but relies on **libuv** to perform certain expensive operations asynchronously. libuv maintains an internal **threadpool** to offload work that cannot be handled by OS-level async primitives (e.g., `epoll`/`kqueue`).
-
-Operations routed to the libuv threadpool include:
-
-| Category | Examples |
-|---|---|
-| **Crypto** | `pbkdf2`, `scrypt`, `randomBytes`, `crypto.sign` |
-| **File system** | `fs.readFile`, `fs.writeFile`, `fs.stat` |
-| **DNS** | `dns.lookup` (not `dns.resolve`, which uses c-ares) |
-| **Compression** | `zlib.deflate`, `zlib.gzip` |
-
-By default, `UV_THREADPOOL_SIZE = 4`. If more than 4 of these operations are in-flight simultaneously, the extras **queue** and wait for a thread to become available. This introduces latency under concurrent load.
+# UV_THREADPOOL_SIZE Benchmark Results
+> Teammate 3 (Infrastructure) · Teacher checklist: "UV_THREADPOOL_SIZE tuning (default 4 → observe → increase)"
 
 ---
 
-## 2. Why This Matters for AarogyaLink
+## What Is UV_THREADPOOL_SIZE?
 
-Our PDF generation pipeline uses **pdfkit**, which performs synchronous in-memory rendering followed by `fs.createWriteStream` file I/O. When a doctor completes a consultation, the system:
+Node.js uses **libuv**, a C library that handles I/O operations asynchronously. libuv maintains a thread pool for tasks that cannot be made truly non-blocking at the OS level — including:
+- File system reads/writes (`fs.readFile`, `fs.writeFile`)
+- DNS lookups (`dns.lookup`)
+- Crypto operations (`crypto.pbkdf2`, `bcrypt.hash`)
+- **zlib compression**
+- Any code explicitly run in a `worker_thread`
 
-1. Queues a BullMQ job
-2. The BullMQ consumer spawns a native **worker thread** (`worker_threads`)
-3. Inside that thread, pdfkit generates the PDF and writes it to disk
+The default pool size is **4 threads**. This means if 5 CPU-bound or blocking I/O operations are queued simultaneously, the 5th must wait — adding latency.
 
-With the default pool size of 4, if multiple doctors complete consultations simultaneously, the file I/O portion of PDF generation competes for threadpool slots with other `fs` and `crypto` operations (like JWT `sign`/`verify` and `bcrypt` password hashing).
-
-Setting `UV_THREADPOOL_SIZE = 16` in `server.js` ensures that up to 16 of these operations can proceed in parallel, reducing queue wait times.
-
----
-
-## 3. Benchmark Methodology
-
-**Script:** `backend/tests/threadpool-benchmark.js`
-
-The benchmark fires **16 concurrent `crypto.pbkdf2` calls** (100,000 iterations each) — a CPU-heavy operation routed through the libuv threadpool. Each test run uses a child process with a specific `UV_THREADPOOL_SIZE` to ensure clean isolation.
-
-```
-Concurrent pbkdf2 tasks : 16
-Iterations per task     : 100,000
-Key length              : 64 bytes (SHA-512)
-```
-
-This simulates a worst-case scenario where many blocking operations compete for threadpool slots simultaneously — similar to a burst of concurrent bookings + PDF generations.
+**Setting `UV_THREADPOOL_SIZE=16`** allows 16 parallel such operations, reducing wait time under concurrent load.
 
 ---
 
-## 4. Benchmark Results
-
-> **Instructions:** Run the benchmark and replace the placeholder values below.
->
-> ```bash
-> cd backend
-> node tests/threadpool-benchmark.js
-> ```
-
-| UV_THREADPOOL_SIZE | Wall-Clock Time (ms) | Speedup vs Default |
-|---|---|---|
-| **4** (default) | ___ ms | 1.00x |
-| **8** | ___ ms | ___x |
-| **16** (our setting) | ___ ms | ___x |
-
-### Expected Behavior
-
-- **Size 4:** 16 tasks compete for 4 threads → 4 "rounds" of execution → ~4x the single-task time.
-- **Size 8:** 16 tasks / 8 threads → 2 rounds → ~2x the single-task time.
-- **Size 16:** 16 tasks / 16 threads → 1 round → near single-task time.
-
-The improvement is most dramatic going from 4 → 8 (halves the wait). Going from 8 → 16 continues to help but with diminishing returns depending on CPU cores.
-
----
-
-## 5. Trade-offs
-
-| Factor | Small Pool (4) | Large Pool (16+) |
-|---|---|---|
-| Memory | Lower (fewer OS threads) | Higher (~1 MB stack per thread) |
-| Context switching | Minimal | Moderate on low-core machines |
-| Throughput under load | Limited by queuing | Higher parallelism |
-| Idle overhead | Negligible | Threads stay alive but idle |
-
-### Our Decision
-
-We set `UV_THREADPOOL_SIZE = 16` because:
-
-1. **Concurrent PDF generation** is a core requirement (multiple doctors completing consults).
-2. **JWT operations** (`sign`/`verify`) happen on every authenticated request and also use the threadpool via OpenSSL.
-3. Our deployment target (Docker container) typically gets 2–4 vCPUs, which can keep 16 threads busy without excessive context switching.
-4. The ~16 MB additional memory cost (16 threads × ~1 MB stack) is negligible for a server process.
-
----
-
-## 6. Where This Is Configured
+## Configuration in AarogyaLink
 
 ```js
-// backend/src/server.js — Line 2
+// backend/src/server.js — MUST be line 1-2, before any require() calls
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || 16;
 ```
 
-> **Important:** `UV_THREADPOOL_SIZE` must be set **before** any libuv I/O occurs (i.e., before `require('fs')` or `require('crypto')` are first called). Setting it in `server.js` at the top of the file ensures this.
+Also set via `.env`:
+```env
+UV_THREADPOOL_SIZE=16
+```
 
 ---
 
-## 7. References
+## How to Run the Benchmark
 
-- [Node.js docs — UV_THREADPOOL_SIZE](https://nodejs.org/api/cli.html#uv_threadpool_sizesize)
-- [libuv design overview — Thread pool](https://docs.libuv.org/en/v1.x/design.html#the-i-o-loop)
-- [Node.js Crypto module — threadpool usage](https://nodejs.org/api/crypto.html)
+```bash
+cd backend
+node tests/threadpool-benchmark.js
+```
+
+**What it does:**
+1. Runs 100 concurrent `bcrypt.hash` operations (CPU-bound — uses the thread pool)
+2. Records wall-clock time for all 100 operations to complete
+3. Shows difference between UV_THREADPOOL_SIZE = 4 vs 16
 
 ---
 
-*AarogyaLink · MERN Stack BTech · Project 11*
+## Benchmark Methodology
+
+```
+Test: 100 parallel bcrypt.hash(password, 10)
+      ↓
+Each hash is CPU-bound and runs in the libuv thread pool
+      ↓
+UV_THREADPOOL_SIZE=4   → only 4 threads active at a time → queue builds up
+UV_THREADPOOL_SIZE=16  → 16 threads → minimal queuing → fastest wall time
+      ↓
+Speedup = wall_clock_time_size4 / wall_clock_time_size16
+```
+
+---
+
+## Results Table
+
+| UV_THREADPOOL_SIZE | Wall-Clock Time | Speedup vs Size=4 | Notes |
+|---|---|---|---|
+| **4** (Node.js default) | Run `node tests/threadpool-benchmark.js` to fill | 1.00× (baseline) | Threads saturated immediately |
+| **16** (our setting) | Run to fill | ~2.5–3.5× expected | Optimal for this workload |
+
+> **To fill in actual numbers:** Run `node tests/threadpool-benchmark.js` and paste the output above.
+
+---
+
+## Why UV_THREADPOOL_SIZE=16 for AarogyaLink?
+
+AarogyaLink has **three concurrent thread-pool consumers** under production load:
+
+| Operation | Thread Pool Use | Frequency |
+|---|---|---|
+| `bcrypt.hash` (user login/register) | Heavy CPU | Every auth request |
+| PDF generation (`pdfkit` in worker_thread) | File I/O + CPU | Per consultation |
+| DNS lookups (Nodemailer SMTP) | Blocking DNS | Every email |
+
+With the default size=4, concurrent logins + PDF generation + email sends could queue behind each other. With size=16, all three can run simultaneously without blocking the main event loop.
+
+---
+
+## Worker Threads vs UV Thread Pool
+
+| | UV Thread Pool | Worker Threads |
+|---|---|---|
+| **Purpose** | Async I/O + crypto | CPU-bound JS code |
+| **Count** | `UV_THREADPOOL_SIZE` | Controlled by `new Worker()` |
+| **Use in AarogyaLink** | bcrypt, DNS, file I/O | PDF generation (pdfkit) |
+
+Both keep the main event loop free.
+
+---
+
+## Event Loop Lag Proof
+
+```bash
+node tests/eventloop_lag.js
+```
+
+- **Scenario A (blocking):** PDF on main thread → event loop lag spikes (20–100ms)
+- **Scenario B (worker_thread):** PDF offloaded → event loop lag near zero (<2ms)
+
+See [`load_test_results.md`](load_test_results.md) for full results.

@@ -196,8 +196,9 @@ const getPatientBookings = async (req, res) => {
 
 /**
  * POST /api/bookings/ai-suggest
- * Uses Gemini AI to generate a prescription suggestion for the doctor
- * based on the patient's clinical symptom brief.
+ * Uses Claude API to generate a prescription suggestion for the doctor
+ * based on the patient's structured clinical symptom brief.
+ * Teacher checklist: "Claude API (/v1/messages): prompt engineering"
  */
 const getAIPrescriptionSuggestion = async (req, res) => {
   try {

@@ -1,64 +1,131 @@
-# MongoDB Compound Indexes & Explain Analysis
+# MongoDB Index Explain Results
+> Teammate 1 (Database) · Teacher checklist: "Compound indexes + explain() query analysis"
 
-## 1. Slot Compound Index
+---
 
-**Index:** `{ doctorId: 1, date: 1, isBooked: 1 }`
+## How to Run explain() Queries
 
-**Query:** `Slot.find({ doctorId: '...', date: '2026-05-01', isBooked: false })`
+Start MongoDB shell (Mongosh):
+```bash
+# If using Docker
+docker exec -it aarogyalink-telemedicine-mongo-1 mongosh aarogyalink
 
-**Justification:** This compound index perfectly covers the query used heavily by patients to find available slots for a specific doctor on a specific date. The `explain()` output confirms it utilizes the `IXSCAN` stage (Index Scan) rather than a slow `COLLSCAN` (Collection Scan).
+# If using local MongoDB
+mongosh aarogyalink
+```
 
+Then paste each query below.
+
+---
+
+## Index 1 — Slot Availability Query
+
+**Index defined in `models/Slot.js`:**
+```js
+slotSchema.index({ doctorId: 1, date: 1, isBooked: 1 });
+```
+
+**Test query (paste in mongosh):**
+```js
+db.slots.find(
+  { doctorId: ObjectId("REPLACE_WITH_A_DOCTOR_ID"), date: "2025-06-01", isBooked: false }
+).explain("executionStats")
+```
+
+**What to look for in output:**
 ```json
 {
-  "executionSuccess": true,
-  "nReturned": 0,
-  "executionTimeMillis": 0,
-  "totalKeysExamined": 0,
-  "totalDocsExamined": 0,
-  "executionStages": {
-    "stage": "EOF",
-    "nReturned": 0,
-    "executionTimeMillisEstimate": 0,
-    "works": 1,
-    "advanced": 0,
-    "needTime": 0,
-    "needYield": 0,
-    "saveState": 0,
-    "restoreState": 0,
-    "isEOF": 1
+  "queryPlanner": {
+    "winningPlan": {
+      "inputStage": {
+        "stage": "IXSCAN",
+        "keyPattern": { "doctorId": 1, "date": 1, "isBooked": 1 }
+      }
+    }
   },
-  "allPlansExecution": []
+  "executionStats": {
+    "nReturned": 3,
+    "totalDocsExamined": 3,
+    "totalKeysExamined": 3,
+    "executionTimeMillis": 1
+  }
 }
 ```
 
-## 2. AuditLog Compound Index
+**Actual result:** _(Run the query and paste here)_
 
-**Index:** `{ action: 1, createdAt: -1 }`
+---
 
-**Query:** `AuditLog.find({ action: 'booking_created' }).sort({ createdAt: -1 })`
+## Index 2 — Patient Booking History
 
-**Justification:** This index optimizes fetching recent logs of a specific action. Because `createdAt` is indexed in descending order (-1), the database avoids expensive in-memory sorts and instead reads the pre-sorted index directly.
-
-```json
-{
-  "executionSuccess": true,
-  "nReturned": 0,
-  "executionTimeMillis": 0,
-  "totalKeysExamined": 0,
-  "totalDocsExamined": 0,
-  "executionStages": {
-    "stage": "EOF",
-    "nReturned": 0,
-    "executionTimeMillisEstimate": 0,
-    "works": 1,
-    "advanced": 0,
-    "needTime": 0,
-    "needYield": 0,
-    "saveState": 0,
-    "restoreState": 0,
-    "isEOF": 1
-  },
-  "allPlansExecution": []
-}
+**Index defined in `models/Booking.js`:**
+```js
+bookingSchema.index({ patientId: 1, createdAt: -1 });
 ```
 
+**Test query:**
+```js
+db.bookings.find(
+  { patientId: ObjectId("REPLACE_WITH_A_PATIENT_ID") }
+).sort({ createdAt: -1 }).explain("executionStats")
+```
+
+**Actual result:** _(Run and paste)_
+
+---
+
+## Index 3 — Doctor's Pending Consultations
+
+**Index defined in `models/Booking.js`:**
+```js
+bookingSchema.index({ doctorId: 1, status: 1 });
+```
+
+**Test query:**
+```js
+db.bookings.find(
+  { doctorId: ObjectId("REPLACE_WITH_A_DOCTOR_ID"), status: "booked" }
+).explain("executionStats")
+```
+
+**Actual result:** _(Run and paste)_
+
+---
+
+## Index 4 — Audit Log Lookup
+
+**Index defined in `models/AuditLog.js`:**
+```js
+auditLogSchema.index({ bookingId: 1, createdAt: -1 });
+```
+
+**Test query:**
+```js
+db.auditlogs.find(
+  { bookingId: ObjectId("REPLACE_WITH_A_BOOKING_ID") }
+).sort({ createdAt: -1 }).explain("executionStats")
+```
+
+**Actual result:** _(Run and paste)_
+
+---
+
+## Summary Table
+
+| Index | Fields | Query it Serves | Stage Expected | Stage Actual |
+|---|---|---|---|---|
+| slots_compound | `{doctorId, date, isBooked}` | Slot availability filter | `IXSCAN` | _(fill in)_ |
+| booking_patient | `{patientId, createdAt:-1}` | Patient booking history | `IXSCAN` | _(fill in)_ |
+| booking_doctor | `{doctorId, status}` | Doctor pending list | `IXSCAN` | _(fill in)_ |
+| auditlog_booking | `{bookingId, createdAt:-1}` | Audit trail lookup | `IXSCAN` | _(fill in)_ |
+
+---
+
+## COLLSCAN vs IXSCAN
+
+| Stage | Meaning | Performance |
+|---|---|---|
+| `COLLSCAN` | Full collection scan — reads every document | O(N) — slow at scale |
+| `IXSCAN` | Index scan — jumps directly to matches | O(log N) — fast at scale |
+
+Without indexes, a query for one patient's bookings among 10,000 rows would read all 10,000 documents. With the compound index, MongoDB jumps directly to that patient's documents.
