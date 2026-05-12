@@ -3,6 +3,11 @@ const router = express.Router();
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
+const { auth } = require('../middleware/auth');
+const { checkRole } = require('../middleware/rbac');
+
+// Apply auth + admin role to ALL routes in this file
+router.use(auth, checkRole(['admin']));
 
 /**
  * GET /api/admin/analytics

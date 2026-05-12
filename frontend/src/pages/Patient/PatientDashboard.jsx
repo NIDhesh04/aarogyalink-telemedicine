@@ -4,7 +4,7 @@ import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import { useQueuePosition } from '../../hooks/useQueuePosition'
-import { Calendar, CheckCircle2, Hash, Clock, User as UserIcon, AlertCircle, Activity } from 'lucide-react'
+import { Calendar, CheckCircle, Hash, Clock, User, AlertCircle, Activity, Download, ChevronRight } from 'lucide-react'
 
 export default function PatientDashboard() {
   const { user } = useAuth()
@@ -15,7 +15,6 @@ export default function PatientDashboard() {
   const [bookedData, setBookedData] = useState(null)
   const [tab, setTab] = useState('book')
 
-  // Real data state
   const [slots, setSlots] = useState([])
   const [bookings, setBookings] = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -40,10 +39,10 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     if (tab !== 'history') return
-    axiosInstance.get(`/bookings`)
+    axiosInstance.get(`/bookings?patientId=${user?.id}`)
       .then(r => setBookings(r.data))
       .catch(() => setBookings([]))
-  }, [tab])
+  }, [tab, user?.id])
 
   const handleBook = async () => {
     if (!selectedSlot || !symptom.trim()) return
@@ -53,7 +52,7 @@ export default function PatientDashboard() {
       const { data } = await axiosInstance.post('/bookings', {
         slotId: selectedSlot._id,
         patientId: user.id,
-        symptomBrief: symptom,
+        rawSymptoms: symptom,
       })
       setBookedData(data)
       setBooked(true)
@@ -67,41 +66,42 @@ export default function PatientDashboard() {
   const upcomingCount = bookings.filter(b => b.status === 'booked').length
   const doneCount = bookings.filter(b => b.status === 'completed').length
 
-  const StatCard = ({ icon: Icon, value, label, colorClass, delay }) => (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow"
-    >
-      <div className={`p-4 rounded-xl ${colorClass}`}>
-        <Icon size={28} />
-      </div>
-      <div>
-        <div className="text-3xl font-bold text-slate-800">{value}</div>
-        <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{label}</div>
-      </div>
-    </motion.div>
-  )
+  const STATUS_CONFIG = {
+    booked:    { label: 'Scheduled', class: 'bg-sky-50 text-sky-700 border-sky-200' },
+    completed: { label: 'Completed', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    cancelled: { label: 'Cancelled', class: 'bg-red-50 text-red-700 border-red-200' },
+  }
 
   return (
-    <DashboardLayout 
-      title={`Namaste, ${user?.name?.split(' ')[0] ?? 'Patient'} 👋`}
-      subtitle="Book a consultation or track your upcoming appointments"
+    <DashboardLayout
+      title={`Welcome, ${user?.name ?? 'Patient'}`}
+      subtitle="Book a consultation or view your appointment history"
     >
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard icon={Calendar} value={upcomingCount} label="Upcoming" colorClass="bg-primary/10 text-primary" delay={0.1} />
-        <StatCard icon={CheckCircle2} value={doneCount} label="Consultations Done" colorClass="bg-emerald-100 text-emerald-600" delay={0.2} />
-        <StatCard icon={Hash} value={bookedData?.queuePos ?? '—'} label="Queue Position" colorClass="bg-amber-100 text-amber-600" delay={0.3} />
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {[
+          { icon: Calendar, value: upcomingCount, label: 'Scheduled Appointments', color: 'text-sky-700 bg-sky-50 border-sky-100' },
+          { icon: CheckCircle, value: doneCount, label: 'Completed Consultations', color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+          { icon: Hash, value: bookedData?.queuePos ?? '—', label: 'Current Queue Position', color: 'text-violet-700 bg-violet-50 border-violet-100' },
+        ].map((s, i) => (
+          <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+            className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center border shrink-0 ${s.color}`}>
+              <s.icon size={18} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">{s.label}</p>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex bg-slate-200/50 p-1.5 rounded-xl mb-8 w-fit">
-        {[['book', 'Book a Slot'], ['history', 'My Bookings']].map(([key, label]) => (
-          <button 
-            key={key} 
-            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${tab === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+      {/* Tab bar */}
+      <div className="flex border border-slate-200 rounded-lg p-0.5 w-fit mb-6 bg-white">
+        {[['book', 'Book Consultation'], ['history', 'My Appointments']].map(([key, label]) => (
+          <button key={key}
+            className={`px-5 py-2 text-sm font-semibold rounded-md transition-all ${tab === key ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             onClick={() => setTab(key)}
           >
             {label}
@@ -111,157 +111,138 @@ export default function PatientDashboard() {
 
       <AnimatePresence mode="wait">
         {tab === 'book' && (
-          <motion.div 
-            key="book"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
-          >
+          <motion.div key="book" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Slot Picker */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
-              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Calendar className="text-primary" size={24} /> Choose a Date & Slot
-              </h3>
-              
-              <div className="mb-6">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Select Date</label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  min={new Date().toISOString().split('T')[0]}
-                  onChange={e => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700"
-                />
+            <div className="bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <Calendar size={16} className="text-slate-400" /> Select Date & Available Slot
+                </h2>
               </div>
+              <div className="p-6 flex flex-col gap-4 flex-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Appointment Date</label>
+                  <input type="date" value={selectedDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm font-medium text-slate-700 transition-all"
+                  />
+                </div>
 
-              <div className="flex-1">
-                {loadingSlots ? (
-                  <div className="flex flex-col justify-center items-center h-48 space-y-3">
-                    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-                    <p className="text-sm font-medium text-slate-500">Loading available slots...</p>
-                  </div>
-                ) : slots.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <Calendar size={32} className="text-slate-300 mb-2" />
-                    <p className="text-sm font-medium text-slate-500">No slots available on this date.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
-                    {slots.map(slot => (
-                      <button
-                        key={slot._id}
-                        onClick={() => setSelectedSlot(slot)}
-                        className={`flex flex-col items-start p-4 rounded-xl border text-left transition-all ${selectedSlot?._id === slot._id ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm' : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'}`}
-                      >
-                        <div className="font-bold text-slate-800 mb-1">{slot.doctorId?.name ?? 'Doctor'}</div>
-                        <div className="text-xs font-medium text-slate-500 mb-3">{slot.doctorId?.specialty ?? slot.specialty ?? 'General'}</div>
-                        <div className="mt-auto inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md text-xs font-bold text-slate-600">
-                          <Clock size={12} /> {slot.time}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="flex-1">
+                  {loadingSlots ? (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2">
+                      <div className="w-6 h-6 border-2 border-slate-200 border-t-[#0284c7] rounded-full animate-spin" />
+                      <p className="text-xs text-slate-400 font-medium">Loading slots...</p>
+                    </div>
+                  ) : slots.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 rounded-lg border border-dashed border-slate-200 bg-slate-50">
+                      <Calendar size={24} className="text-slate-300 mb-2" />
+                      <p className="text-sm font-medium text-slate-400">No slots available on this date.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                      {slots.map(slot => (
+                        <button key={slot._id} onClick={() => setSelectedSlot(slot)}
+                          className={`flex items-start justify-between p-3.5 rounded-lg border text-left transition-all ${selectedSlot?._id === slot._id ? 'border-[#0284c7] bg-sky-50 ring-1 ring-[#0284c7]' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{slot.doctorId?.name ?? 'Doctor'}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{slot.doctorId?.specialty ?? 'General'}</p>
+                          </div>
+                          <span className="flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-md mt-0.5 shrink-0">
+                            <Clock size={11} /> {slot.time}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Symptom Form & Success */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+            {/* Symptom form / Success */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
               <AnimatePresence mode="wait">
                 {booked ? (
-                  <motion.div 
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center text-center h-full justify-center"
-                  >
-                    <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-6">
-                      <CheckCircle2 size={40} />
+                  <motion.div key="success" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="flex flex-col items-center text-center p-8 h-full justify-center">
+                    <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center mb-5">
+                      <CheckCircle size={28} className="text-emerald-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Booking Confirmed!</h3>
-                    <p className="text-slate-500 font-medium mb-8">
+                    <h3 className="text-lg font-bold text-slate-900 mb-1">Appointment Confirmed</h3>
+                    <p className="text-sm text-slate-500 mb-6">
                       {selectedSlot?.doctorId?.name ?? 'Doctor'} &bull; {selectedSlot?.time}
                     </p>
-                    
+
                     {bookedData?.booking && (
-                      <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl w-full text-center relative overflow-hidden mb-8">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
-                        <p className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2">Live Queue Position</p>
-                        <div className="text-5xl font-black text-amber-500 tracking-tighter mb-3">
-                          #{queueInfo.connected && queueInfo.position ? queueInfo.position : (bookedData.queuePos ?? '?')}
-                        </div>
-                        {queueInfo.connected && queueInfo.patientsAhead > 0 && (
-                          <p className="text-sm font-medium text-amber-700">
-                            {queueInfo.patientsAhead} patient(s) ahead of you.
-                          </p>
+                      <div className="w-full bg-sky-50 border border-sky-200 rounded-xl p-5 mb-6 text-center">
+                        <p className="text-xs font-semibold text-sky-600 uppercase tracking-wider mb-2">Live Queue Position</p>
+                        <p className="text-4xl font-bold text-[#075985] mb-2">
+                          #{queueInfo.connected && queueInfo.position ? queueInfo.position : (bookedData.queuePos ?? '—')}
+                        </p>
+                        {queueInfo.patientsAhead > 0 && (
+                          <p className="text-sm text-slate-500">{queueInfo.patientsAhead} patient(s) ahead of you</p>
                         )}
-                        {queueInfo.connected && queueInfo.position === 1 && (
-                          <motion.p 
-                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                            className="text-sm font-bold text-emerald-600 mt-2 bg-emerald-50 py-1.5 px-3 rounded-full inline-block"
-                          >
-                            You are next! Please get ready.
-                          </motion.p>
+                        {queueInfo.position === 1 && (
+                          <p className="text-sm font-semibold text-emerald-600 mt-2">You are next — please be ready.</p>
                         )}
                       </div>
                     )}
-                    <button 
+
+                    <button
                       onClick={() => { setBooked(false); setSymptom(''); setSelectedSlot(null); setBookedData(null) }}
-                      className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                      className="px-5 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       Book Another Consultation
                     </button>
                   </motion.div>
                 ) : (
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
-                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-1">
-                      <Activity className="text-primary" size={24} /> Describe Symptoms
-                    </h3>
-                    <p className="text-sm font-medium text-slate-500 mb-6">Our AI will create a structured medical brief for the doctor.</p>
-                    
-                    {error && (
-                      <div className="mb-4 flex items-start gap-2 p-3 bg-red-50 text-red-600 text-sm font-medium rounded-lg border border-red-100">
-                        <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                        <p>{error}</p>
-                      </div>
-                    )}
-
-                    <textarea
-                      value={symptom}
-                      onChange={e => setSymptom(e.target.value)}
-                      placeholder="e.g. I have had a fever of 101°F for 3 days along with a sore throat..."
-                      className="w-full flex-1 min-h-[200px] px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700 resize-none mb-6"
-                    />
-
-                    {selectedSlot ? (
-                      <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-center justify-between mb-6">
-                        <div>
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Selected Slot</p>
-                          <p className="text-sm font-bold text-slate-800">{selectedSlot.doctorId?.name ?? 'Doctor'} at {selectedSlot.time}</p>
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                      <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                        <Activity size={16} className="text-slate-400" /> Describe Your Symptoms
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">Our AI will structure this into a clinical brief for the doctor.</p>
+                    </div>
+                    <div className="p-6 flex flex-col flex-1 gap-4">
+                      {error && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+                          <AlertCircle size={15} className="shrink-0" /> <p>{error}</p>
                         </div>
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-primary">
-                          <CheckCircle2 size={20} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-50 border border-slate-200 border-dashed p-4 rounded-xl text-center mb-6">
-                        <p className="text-sm font-medium text-slate-500">Please select a slot from the left to continue.</p>
-                      </div>
-                    )}
+                      )}
 
-                    <button
-                      onClick={handleBook}
-                      disabled={!selectedSlot || !symptom.trim() || loadingBook}
-                      className={`w-full py-4 rounded-xl font-bold text-white shadow-md flex items-center justify-center transition-all ${(!selectedSlot || !symptom.trim() || loadingBook) ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-primary hover:bg-primary-light hover:shadow-lg hover:-translate-y-0.5'}`}
-                    >
-                      {loadingBook ? (
-                        <>
-                           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                           Booking Appointment...
-                        </>
-                      ) : 'Confirm Booking'}
-                    </button>
+                      <textarea value={symptom} onChange={e => setSymptom(e.target.value)}
+                        placeholder="Describe your symptoms in plain language, e.g. I have had a fever of 101°F for 3 days with sore throat and body ache..."
+                        className="flex-1 w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm text-slate-700 resize-none min-h-[140px] transition-all"
+                      />
+
+                      {selectedSlot ? (
+                        <div className="flex items-center justify-between p-3.5 rounded-lg bg-sky-50 border border-sky-200">
+                          <div>
+                            <p className="text-xs font-semibold text-sky-700 uppercase tracking-wider mb-0.5">Selected Slot</p>
+                            <p className="text-sm font-semibold text-slate-800">{selectedSlot.doctorId?.name ?? 'Doctor'} — {selectedSlot.time}</p>
+                          </div>
+                          <CheckCircle size={18} className="text-sky-600" />
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-center">
+                          <p className="text-sm text-slate-400 font-medium">Select a slot from the panel on the left.</p>
+                        </div>
+                      )}
+
+                      <button onClick={handleBook}
+                        disabled={!selectedSlot || !symptom.trim() || loadingBook}
+                        className={`w-full py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all ${(!selectedSlot || !symptom.trim() || loadingBook) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#075985] text-white hover:bg-[#0369a1] shadow-sm hover:shadow-md'}`}
+                      >
+                        {loadingBook ? (
+                          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Booking...</>
+                        ) : (
+                          <>Confirm Appointment <ChevronRight size={16} /></>
+                        )}
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -270,52 +251,53 @@ export default function PatientDashboard() {
         )}
 
         {tab === 'history' && (
-          <motion.div 
-            key="history"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"
-          >
-            <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-              <Clock className="text-slate-400" size={24} /> Booking History
-            </h3>
-            
-            <div className="space-y-4">
-              {bookings.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="font-medium text-slate-500">No bookings found.</p>
-                </div>
-              ) : bookings.map((b, i) => {
-                const isCompleted = b.status === 'completed'
-                const isCancelled = b.status === 'cancelled'
-                const statusColor = isCompleted ? 'bg-emerald-100 text-emerald-700' : isCancelled ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'
-                
-                return (
-                  <div key={b._id ?? i} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
-                        <UserIcon size={20} />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">{b.doctorId?.name ?? 'Doctor'}</div>
-                        <div className="text-sm font-medium text-slate-500 mt-0.5">{b.slotId?.date ?? '—'} &bull; {b.slotId?.time ?? '—'}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-start sm:self-auto ml-16 sm:ml-0">
-                      {b.queuePos && b.status === 'booked' && (
-                        <div className="flex items-center gap-1 text-sm font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md">
-                          <Hash size={14} /> {b.queuePos} in queue
-                        </div>
-                      )}
-                      <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusColor}`}>
-                        {b.status || 'booked'}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+          <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <Clock size={16} className="text-slate-400" /> Appointment History
+              </h2>
+              <span className="text-xs text-slate-400 font-medium">{bookings.length} record{bookings.length !== 1 ? 's' : ''}</span>
             </div>
+
+            {bookings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-center">
+                <Calendar size={28} className="text-slate-300 mb-3" />
+                <p className="text-sm font-medium text-slate-400">No appointments on record.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {bookings.map((b, i) => {
+                  const sc = STATUS_CONFIG[b.status] || STATUS_CONFIG.booked
+                  return (
+                    <motion.div key={b._id ?? i}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
+                      className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          <User size={16} className="text-slate-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">Dr. {b.doctorId?.name ?? '—'}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                            {b.slotId?.date ?? '—'} &bull; {b.slotId?.time ?? '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 ml-13 sm:ml-0">
+                        {b.prescriptionUrl && (
+                          <a href={`http://localhost:5005${b.prescriptionUrl}`} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                            <Download size={13} /> Download Prescription
+                          </a>
+                        )}
+                        <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border ${sc.class}`}>{sc.label}</span>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

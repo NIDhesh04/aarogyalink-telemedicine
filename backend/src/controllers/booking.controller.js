@@ -4,7 +4,7 @@ const Booking = require('../models/Booking');
 const AuditLog = require('../models/AuditLog');
 const User = require('../models/User');
 const { client } = require('../config/redis');
-const { generateClinicalBrief } = require('../services/ai/triage.service');
+const { generateClinicalBrief, generatePrescriptionSuggestion } = require('../services/ai/triage.service');
 const queueSSEManager = require('../services/sse/queue.sse');
 const { addPDFJob } = require('../services/queue/pdf.queue');
 const { sendBookingConfirmation } = require('../services/mail/mail.service');
@@ -173,9 +173,49 @@ const completeBooking = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/bookings
+ * Returns all bookings for the logged-in patient (via query param patientId).
+ * Populates doctorId, slotId, and includes prescriptionUrl for PDF download.
+ */
+const getPatientBookings = async (req, res) => {
+  try {
+    const { patientId } = req.query;
+    if (!patientId) return res.status(400).json({ error: 'Missing patientId' });
+
+    const bookings = await Booking.find({ patientId })
+      .populate('doctorId', 'name specialty')
+      .populate('slotId', 'date time')
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /api/bookings/ai-suggest
+ * Uses Gemini AI to generate a prescription suggestion for the doctor
+ * based on the patient's clinical symptom brief.
+ */
+const getAIPrescriptionSuggestion = async (req, res) => {
+  try {
+    const { symptomBrief } = req.body;
+    if (!symptomBrief) return res.status(400).json({ error: 'Missing symptomBrief' });
+
+    const suggestion = await generatePrescriptionSuggestion(symptomBrief);
+    res.json({ suggestion });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   createBooking,
   getDoctorQueue,
   getPatientQueuePosition,
   completeBooking,
+  getPatientBookings,
+  getAIPrescriptionSuggestion,
 };

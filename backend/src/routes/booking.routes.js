@@ -5,18 +5,28 @@ const {
   getDoctorQueue,
   getPatientQueuePosition,
   completeBooking,
+  getPatientBookings,
+  getAIPrescriptionSuggestion,
 } = require('../controllers/booking.controller');
+const { auth } = require('../middleware/auth');
+const { checkRole } = require('../middleware/rbac');
 
-// ─── POST /api/bookings ───────────────────────────────────────────────────────
-router.post('/', createBooking);
+// ─── GET /api/bookings?patientId=xxx ─── Patient only ────────────────────────
+router.get('/', auth, checkRole(['patient', 'asha', 'admin']), getPatientBookings);
 
-// ─── GET /api/bookings/queue/:doctorId ────────────────────────────────────────
-router.get('/queue/:doctorId', getDoctorQueue);
+// ─── POST /api/bookings ─── Patient or ASHA ───────────────────────────────────
+router.post('/', auth, checkRole(['patient', 'asha']), createBooking);
 
-// ─── GET /api/bookings/position/:doctorId/:bookingId ─────────────────────────
-router.get('/position/:doctorId/:bookingId', getPatientQueuePosition);
+// ─── POST /api/bookings/ai-suggest ─── Doctor only ───────────────────────────
+router.post('/ai-suggest', auth, checkRole(['doctor']), getAIPrescriptionSuggestion);
 
-// ─── POST /api/bookings/complete/:bookingId ──────────────────────────────────
-router.post('/complete/:bookingId', completeBooking);
+// ─── GET /api/bookings/queue/:doctorId ─── Doctor or Admin ───────────────────
+router.get('/queue/:doctorId', auth, checkRole(['doctor', 'admin']), getDoctorQueue);
+
+// ─── GET /api/bookings/position/:doctorId/:bookingId ─── Patient or ASHA ─────
+router.get('/position/:doctorId/:bookingId', auth, checkRole(['patient', 'asha']), getPatientQueuePosition);
+
+// ─── POST /api/bookings/complete/:bookingId ─── Doctor only ──────────────────
+router.post('/complete/:bookingId', auth, checkRole(['doctor']), completeBooking);
 
 module.exports = router;

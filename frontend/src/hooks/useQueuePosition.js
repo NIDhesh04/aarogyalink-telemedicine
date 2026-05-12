@@ -21,7 +21,7 @@ export function useQueuePosition(doctorId, bookingId) {
     if (!doctorId || !bookingId) return
     if (esRef.current) esRef.current.close()
 
-    const url = `http://localhost:3000/api/sse/queue/${doctorId}/${bookingId}`
+    const url = `http://localhost:5005/api/sse/queue/${doctorId}/${bookingId}`
     const es = new EventSource(url)
     esRef.current = es
 
