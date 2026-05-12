@@ -5,6 +5,9 @@ validateEnv(); // Fail fast if env vars are missing or malformed
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const morgan = require('morgan');
 const app = express();
 
 // Route Imports
@@ -18,11 +21,14 @@ const prescriptionRoutes = require('./routes/prescription.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 // Middleware
+app.use(helmet());                          // Security headers (CSP, HSTS, X-Frame, etc.)
+app.use(morgan('dev'));                      // HTTP request logging (colored status codes)
 app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
     credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());                    // Parse cookies (needed for JWT refresh token)
 app.use(express.static(path.join(__dirname, '../public'))); // Serve uploads & prescriptions
 
 // Routes

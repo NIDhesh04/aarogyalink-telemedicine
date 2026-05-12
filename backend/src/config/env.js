@@ -41,13 +41,10 @@ const envSchema = z.object({
     .min(8, 'JWT_REFRESH_SECRET must be at least 8 characters')
     .optional(),
 
-  // Anthropic / Claude AI
-  ANTHROPIC_API_KEY: z
-    .string({ required_error: 'ANTHROPIC_API_KEY is required' })
-    .startsWith('sk-ant-', 'ANTHROPIC_API_KEY must start with sk-ant-'),
-  CLAUDE_API_KEY: z
-    .string()
-    .optional(),
+  // Google Gemini AI (used by triage.service.js)
+  GEMINI_API_KEY: z
+    .string({ required_error: 'GEMINI_API_KEY is required' })
+    .min(1, 'GEMINI_API_KEY cannot be empty'),
 
   // Email
   EMAIL_USER: z

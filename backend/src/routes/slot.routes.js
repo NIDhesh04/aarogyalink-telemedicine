@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Slot = require('../models/Slot');
 const { client } = require('../config/redis');
+const { auth } = require('../middleware/auth');
+const { checkRole } = require('../middleware/rbac');
 
 
 // Create a slot (doctor/admin use)
-router.post('/', async (req, res) => {
+router.post('/', auth, checkRole(['doctor', 'admin']), async (req, res) => {
   try {
     const slot = await Slot.create(req.body);
     res.status(201).json(slot);
@@ -15,7 +17,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get available slots filtered by date (and optionally doctorId)
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { doctorId, date } = req.query;
     const cacheKey = `slots:${doctorId || 'all'}:${date || 'any'}`;
@@ -45,7 +47,7 @@ router.get('/', async (req, res) => {
 
 
 // Get all slots for a doctor (their schedule)
-router.get('/doctor/:doctorId', async (req, res) => {
+router.get('/doctor/:doctorId', auth, async (req, res) => {
   try {
     const { date } = req.query;
     const filter = { doctorId: req.params.doctorId };

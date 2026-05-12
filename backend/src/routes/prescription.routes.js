@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/auth');
+const { checkRole } = require('../middleware/rbac');
 const { generatePrescription } = require('../controllers/prescription.controller');
 
 /**
@@ -11,6 +13,6 @@ const { generatePrescription } = require('../controllers/prescription.controller
  *
  * Teammate 3 (Infrastructure)
  */
-router.post('/', generatePrescription);
+router.post('/', auth, checkRole(['doctor']), generatePrescription);
 
 module.exports = router;

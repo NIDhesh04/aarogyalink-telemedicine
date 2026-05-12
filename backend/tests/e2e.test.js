@@ -10,6 +10,7 @@
  *   • BullMQ is mocked so we can assert queue interactions without a
  *     live worker, but we verify the mock was called with the right data.
  *   • The Gemini/Claude AI SDK is mocked to avoid external API calls.
+ *   • All protected routes include auth headers (JWT Bearer tokens).
  *
  * Prerequisites: MongoDB and Redis must be running locally.
  * Run with: npm test -- tests/e2e.test.js
@@ -85,6 +86,9 @@ const state = {
   bookingId: null,
 };
 
+/** Helper: build auth header for a given token */
+const authHeader = (token) => `Bearer ${token}`;
+
 const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
 /* ─── Setup & Teardown ───────────────────────────────────────────────────── */
@@ -127,7 +131,7 @@ afterAll(async () => {
 
 describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
-  // ─── Step 1: Registration ───────────────────────────────────────────────
+  // ─── Step 1: Registration (public routes — no auth needed) ──────────────
   describe('Step 1: User Registration', () => {
 
     it('should register a new Doctor and persist in DB', async () => {
@@ -202,12 +206,39 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     });
   });
 
-  // ─── Step 2: Slot Creation ──────────────────────────────────────────────
+  // ─── Step 1.5: Auth Middleware Verification ─────────────────────────────
+  describe('Step 1.5: Auth Middleware Guards', () => {
+
+    it('should reject unauthenticated slot creation (401)', async () => {
+      await request(app)
+        .post('/api/slots')
+        .send({ doctorId: state.doctorId, date: tomorrow, startTime: '09:00', endTime: '09:30' })
+        .expect(401);
+    });
+
+    it('should reject patient trying to create a slot (403 — RBAC)', async () => {
+      await request(app)
+        .post('/api/slots')
+        .set('Authorization', authHeader(state.patientAccessToken))
+        .send({ doctorId: state.doctorId, date: tomorrow, startTime: '09:00', endTime: '09:30' })
+        .expect(403);
+    });
+
+    it('should reject unauthenticated booking (401)', async () => {
+      await request(app)
+        .post('/api/bookings')
+        .send({ slotId: 'test', patientId: state.patientId })
+        .expect(401);
+    });
+  });
+
+  // ─── Step 2: Slot Creation (doctor auth required) ───────────────────────
   describe('Step 2: Slot Creation', () => {
 
     it('should create a new availability slot and verify in DB', async () => {
       const res = await request(app)
         .post('/api/slots')
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({
           doctorId: state.doctorId,
           date: tomorrow,
@@ -233,6 +264,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should list the slot as available via API', async () => {
       const res = await request(app)
         .get(`/api/slots?doctorId=${state.doctorId}&date=${tomorrow}`)
+        .set('Authorization', authHeader(state.patientAccessToken))
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);
@@ -244,7 +276,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     });
   });
 
-  // ─── Step 3: Booking ────────────────────────────────────────────────────
+  // ─── Step 3: Booking (patient auth required) ───────────────────────────
   describe('Step 3: Booking the Slot', () => {
 
     it('should book the slot and verify DB + Redis state', async () => {
@@ -253,6 +285,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
       const res = await request(app)
         .post('/api/bookings')
+        .set('Authorization', authHeader(state.patientAccessToken))
         .send({
           slotId: state.slotId,
           patientId: state.patientId,
@@ -293,6 +326,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should reject double-booking the same slot (race-condition safety)', async () => {
       const res = await request(app)
         .post('/api/bookings')
+        .set('Authorization', authHeader(state.patientAccessToken))
         .send({
           slotId: state.slotId,
           patientId: state.patientId,
@@ -306,6 +340,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should reject booking with invalid slotId', async () => {
       await request(app)
         .post('/api/bookings')
+        .set('Authorization', authHeader(state.patientAccessToken))
         .send({
           slotId: 'invalid-id',
           patientId: state.patientId,
@@ -316,6 +351,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should reject booking without patientId', async () => {
       await request(app)
         .post('/api/bookings')
+        .set('Authorization', authHeader(state.patientAccessToken))
         .send({
           slotId: state.slotId,
         })
@@ -329,6 +365,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should return the patient position in the queue', async () => {
       const res = await request(app)
         .get(`/api/bookings/position/${state.doctorId}/${state.bookingId}`)
+        .set('Authorization', authHeader(state.patientAccessToken))
         .expect(200);
 
       expect(res.body.position).toBe(1);
@@ -339,6 +376,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should return the full doctor queue', async () => {
       const res = await request(app)
         .get(`/api/bookings/queue/${state.doctorId}`)
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .expect(200);
 
       expect(res.body.total).toBe(1);
@@ -350,11 +388,12 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
       await request(app)
         .get(`/api/bookings/position/${state.doctorId}/${fakeBookingId}`)
+        .set('Authorization', authHeader(state.patientAccessToken))
         .expect(404);
     });
   });
 
-  // ─── Step 5: Complete Consultation ──────────────────────────────────────
+  // ─── Step 5: Complete Consultation (doctor auth required) ───────────────
   describe('Step 5: Completing the Consultation', () => {
 
     it('should complete the booking, update DB, and queue PDF job', async () => {
@@ -366,6 +405,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
       const res = await request(app)
         .post(`/api/bookings/complete/${state.bookingId}`)
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({ prescription: prescriptionText })
         .expect(200);
 
@@ -392,17 +432,26 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
       expect(queue).not.toContain(state.bookingId);
     });
 
+    it('should reject patient trying to complete a booking (403 — RBAC)', async () => {
+      await request(app)
+        .post(`/api/bookings/complete/${state.bookingId}`)
+        .set('Authorization', authHeader(state.patientAccessToken))
+        .send({ prescription: 'Test' })
+        .expect(403);
+    });
+
     it('should return 404 when completing a non-existent booking', async () => {
       const fakeId = new mongoose.Types.ObjectId().toString();
 
       await request(app)
         .post(`/api/bookings/complete/${fakeId}`)
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({ prescription: 'Test' })
         .expect(404);
     });
   });
 
-  // ─── Step 6: Prescription Route ─────────────────────────────────────────
+  // ─── Step 6: Prescription Route (doctor auth required) ──────────────────
   describe('Step 6: Manual Prescription PDF Trigger', () => {
 
     it('should accept PDF generation for a completed booking (202)', async () => {
@@ -410,6 +459,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
       const res = await request(app)
         .post('/api/prescriptions')
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({ bookingId: state.bookingId })
         .expect(202);
 
@@ -422,6 +472,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
 
       await request(app)
         .post('/api/prescriptions')
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({ bookingId: fakeId })
         .expect(404);
     });
@@ -429,8 +480,17 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should reject PDF generation with an invalid bookingId', async () => {
       await request(app)
         .post('/api/prescriptions')
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .send({ bookingId: 'not-a-valid-id' })
         .expect(400);
+    });
+
+    it('should reject patient trying to trigger prescription (403 — RBAC)', async () => {
+      await request(app)
+        .post('/api/prescriptions')
+        .set('Authorization', authHeader(state.patientAccessToken))
+        .send({ bookingId: state.bookingId })
+        .expect(403);
     });
   });
 
@@ -440,6 +500,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should return 404 for completed booking in queue position check', async () => {
       await request(app)
         .get(`/api/bookings/position/${state.doctorId}/${state.bookingId}`)
+        .set('Authorization', authHeader(state.patientAccessToken))
         .expect(404);
     });
 
@@ -452,6 +513,7 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
     it('should verify slot is booked via API', async () => {
       const res = await request(app)
         .get(`/api/slots/doctor/${state.doctorId}?date=${tomorrow}`)
+        .set('Authorization', authHeader(state.doctorAccessToken))
         .expect(200);
 
       const slot = res.body.find(s => s._id === state.slotId);
