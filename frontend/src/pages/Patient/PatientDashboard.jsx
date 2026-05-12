@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
@@ -26,25 +26,60 @@ export default function PatientDashboard() {
     booked ? bookedData?.booking?._id : null
   )
 
-  useEffect(() => {
-    if (!selectedDate) return
+  // ── Fetch available slots on date change ──────────────────────────────
+  // useCallback: stabilises the fetch function so it can be safely listed
+  // in the useEffect dependency array without causing infinite re-renders.
+  const fetchSlots = useCallback((date) => {
+    if (!date) return
     setLoadingSlots(true)
     setError('')
     setSelectedSlot(null)
-    axiosInstance.get(`/slots?date=${selectedDate}`)
+    axiosInstance.get(`/slots?date=${date}`)
       .then(r => setSlots(r.data))
       .catch(() => setSlots([]))
       .finally(() => setLoadingSlots(false))
-  }, [selectedDate])
+  }, [])
 
-  useEffect(() => {
-    if (tab !== 'history') return
-    axiosInstance.get(`/bookings?patientId=${user?.id}`)
+  // ── Fetch booking history when history tab is opened ──────────────────
+  // useCallback: event-handler style — avoids re-subscription when parent
+  // re-renders for unrelated state changes.
+  const fetchBookings = useCallback(() => {
+    if (!user?.id) return
+    axiosInstance.get(`/bookings?patientId=${user.id}`)
       .then(r => setBookings(r.data))
       .catch(() => setBookings([]))
-  }, [tab, user?.id])
+  }, [user?.id])
 
-  const handleBook = async () => {
+  useEffect(() => { fetchSlots(selectedDate) }, [selectedDate, fetchSlots])
+
+  useEffect(() => {
+    if (tab === 'history') fetchBookings()
+  }, [tab, fetchBookings])
+
+  // ── useMemo: sort + filter available slots ────────────────────────────
+  // This computation runs on every render without memoisation because
+  // PatientDashboard has many state variables. useMemo ensures we only
+  // re-sort when the raw `slots` array actually changes.
+  const sortedSlots = useMemo(() => {
+    return [...slots].sort((a, b) => {
+      // Sort by time string (HH:MM AM/PM format is sortable lexicographically)
+      const t1 = a.time || a.startTime || ''
+      const t2 = b.time || b.startTime || ''
+      return t1.localeCompare(t2)
+    })
+  }, [slots])
+
+  // ── useMemo: derive stats for the stat cards ──────────────────────────
+  // Avoids recounting every render — only recomputes when bookings changes.
+  const bookingStats = useMemo(() => ({
+    upcoming:  bookings.filter(b => b.status === 'booked').length,
+    completed: bookings.filter(b => b.status === 'completed').length,
+  }), [bookings])
+
+  // ── Handle booking submission ─────────────────────────────────────────
+  // useCallback: this is passed into the onClick of a button — wrapping
+  // prevents the button from re-rendering when unrelated state changes.
+  const handleBook = useCallback(async () => {
     if (!selectedSlot || !symptom.trim()) return
     setLoadingBook(true)
     setError('')
@@ -61,10 +96,16 @@ export default function PatientDashboard() {
     } finally {
       setLoadingBook(false)
     }
-  }
+  }, [selectedSlot, symptom, user?.id])
 
-  const upcomingCount = bookings.filter(b => b.status === 'booked').length
-  const doneCount = bookings.filter(b => b.status === 'completed').length
+  // ── Reset back to book form ───────────────────────────────────────────
+  // useCallback: handler reference stabilised for the reset button.
+  const handleReset = useCallback(() => {
+    setBooked(false)
+    setSymptom('')
+    setSelectedSlot(null)
+    setBookedData(null)
+  }, [])
 
   const STATUS_CONFIG = {
     booked:    { label: 'Scheduled', class: 'bg-sky-50 text-sky-700 border-sky-200' },
@@ -80,9 +121,9 @@ export default function PatientDashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
-          { icon: Calendar, value: upcomingCount, label: 'Scheduled Appointments', color: 'text-sky-700 bg-sky-50 border-sky-100' },
-          { icon: CheckCircle, value: doneCount, label: 'Completed Consultations', color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-          { icon: Hash, value: bookedData?.queuePos ?? '—', label: 'Current Queue Position', color: 'text-violet-700 bg-violet-50 border-violet-100' },
+          { icon: Calendar,     value: bookingStats.upcoming,           label: 'Scheduled Appointments',   color: 'text-sky-700 bg-sky-50 border-sky-100' },
+          { icon: CheckCircle,  value: bookingStats.completed,          label: 'Completed Consultations',  color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+          { icon: Hash,         value: bookedData?.queuePos ?? '—',     label: 'Current Queue Position',   color: 'text-violet-700 bg-violet-50 border-violet-100' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
@@ -136,14 +177,15 @@ export default function PatientDashboard() {
                       <div className="w-6 h-6 border-2 border-slate-200 border-t-[#0284c7] rounded-full animate-spin" />
                       <p className="text-xs text-slate-400 font-medium">Loading slots...</p>
                     </div>
-                  ) : slots.length === 0 ? (
+                  ) : sortedSlots.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 rounded-lg border border-dashed border-slate-200 bg-slate-50">
                       <Calendar size={24} className="text-slate-300 mb-2" />
                       <p className="text-sm font-medium text-slate-400">No slots available on this date.</p>
                     </div>
                   ) : (
+                    // sortedSlots is memoised — only re-sorted when slots array changes
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                      {slots.map(slot => (
+                      {sortedSlots.map(slot => (
                         <button key={slot._id} onClick={() => setSelectedSlot(slot)}
                           className={`flex items-start justify-between p-3.5 rounded-lg border text-left transition-all ${selectedSlot?._id === slot._id ? 'border-[#0284c7] bg-sky-50 ring-1 ring-[#0284c7]' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                         >
@@ -192,7 +234,7 @@ export default function PatientDashboard() {
                     )}
 
                     <button
-                      onClick={() => { setBooked(false); setSymptom(''); setSelectedSlot(null); setBookedData(null) }}
+                      onClick={handleReset}
                       className="px-5 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       Book Another Consultation

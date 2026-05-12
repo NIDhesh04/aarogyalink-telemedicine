@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
-import { Calendar, CheckCircle2, Clock, User as UserIcon, AlertCircle, PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2 } from 'lucide-react'
+import {
+  Calendar, CheckCircle2, Clock, User as UserIcon, AlertCircle,
+  PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2
+} from 'lucide-react'
 
 const STATUS_MAP = {
-  pending:   { bg: 'bg-amber-100',  color: 'text-amber-600', label: 'Open' },
-  completed: { bg: 'bg-emerald-100',  color: 'text-emerald-600', label: 'Done' },
-  cancelled: { bg: 'bg-red-100',   color: 'text-red-600', label: 'Cancelled' },
-  booked:    { bg: 'bg-teal-100',  color: 'text-teal-600', label: 'Booked' },
+  pending:   { bg: 'bg-amber-100',   color: 'text-amber-600',   label: 'Open' },
+  completed: { bg: 'bg-emerald-100', color: 'text-emerald-600', label: 'Done' },
+  cancelled: { bg: 'bg-red-100',     color: 'text-red-600',     label: 'Cancelled' },
+  booked:    { bg: 'bg-teal-100',    color: 'text-teal-600',    label: 'Booked' },
 }
 
 const TIME_OPTIONS = [
@@ -20,7 +23,7 @@ const TIME_OPTIONS = [
 
 export default function DoctorDashboard() {
   const { user } = useAuth()
-  const [tab, setTab] = useState('schedule') // 'schedule' | 'add'
+  const [tab, setTab] = useState('schedule')
   const [viewDate, setViewDate] = useState(() => new Date().toISOString().split('T')[0])
   const [slots, setSlots] = useState([])
   const [selected, setSelected] = useState(null)
@@ -28,7 +31,6 @@ export default function DoctorDashboard() {
   const [saved, setSaved] = useState({})
   const [loading, setLoading] = useState(true)
 
-  // Add slot form state
   const [newSlot, setNewSlot] = useState({ date: '', time: '', startTime: '', endTime: '' })
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
@@ -37,18 +39,46 @@ export default function DoctorDashboard() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const fetchSlots = (date) => {
+  // ── Fetch doctor's slots for a given date ─────────────────────────────
+  // useCallback: stabilises the function reference so it can be used as a
+  // useEffect dependency and passed as a prop without triggering extra renders.
+  const fetchSlots = useCallback((date) => {
     if (!user?.id) return
     setLoading(true)
     axiosInstance.get(`/slots/doctor/${user.id}?date=${date}`)
       .then(r => setSlots(r.data))
       .catch(() => setSlots([]))
       .finally(() => setLoading(false))
-  }
+  }, [user?.id])
 
-  useEffect(() => { fetchSlots(viewDate) }, [user?.id, viewDate])
+  useEffect(() => { fetchSlots(viewDate) }, [user?.id, viewDate, fetchSlots])
 
-  const handleAddSlot = async (e) => {
+  // ── useMemo: derive stats — only recomputed when `slots` changes ──────
+  // Without useMemo this object is recreated on EVERY render (including
+  // state changes for prescription text, selected slot, etc.), causing
+  // all three StatCard children to unnecessarily re-render.
+  const stats = useMemo(() => ({
+    total:   slots.length,
+    pending: slots.filter(s => !s.isBooked).length,
+    done:    slots.filter(s => s.isBooked).length,
+  }), [slots])
+
+  // ── useMemo: sorted slot list for the schedule panel ─────────────────
+  // Sorting is O(n log n) — memoising means we only sort when the fetched
+  // slot array actually changes, not on every keystroke in the prescription
+  // textarea.
+  const sortedSlots = useMemo(() => {
+    return [...slots].sort((a, b) => {
+      const t1 = a.time || a.startTime || ''
+      const t2 = b.time || b.startTime || ''
+      return t1.localeCompare(t2)
+    })
+  }, [slots])
+
+  // ── Handle new slot creation ──────────────────────────────────────────
+  // useCallback: form submit handler — stabilised so the <form> element
+  // doesn't see a new onSubmit reference on every render.
+  const handleAddSlot = useCallback(async (e) => {
     e.preventDefault()
     if (!newSlot.date || !newSlot.time) return
     setAdding(true); setAddError(''); setAddSuccess('')
@@ -57,8 +87,8 @@ export default function DoctorDashboard() {
         doctorId: user.id,
         date: newSlot.date,
         time: newSlot.time,
-        startTime: newSlot.time.replace(' AM','').replace(' PM',''),
-        endTime: newSlot.time.replace(' AM','').replace(' PM',''),
+        startTime: newSlot.time.replace(' AM', '').replace(' PM', ''),
+        endTime:   newSlot.time.replace(' AM', '').replace(' PM', ''),
       })
       setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
       setNewSlot({ date: '', time: '' })
@@ -68,16 +98,50 @@ export default function DoctorDashboard() {
     } finally {
       setAdding(false)
     }
-  }
+  }, [newSlot, user?.id, viewDate, fetchSlots])
 
-  const stats = {
-    total:   slots.length,
-    pending: slots.filter(s => !s.isBooked).length,
-    done:    slots.filter(s => s.isBooked).length,
-  }
+  // ── AI prescription suggestion ────────────────────────────────────────
+  // useCallback: async handler for the "AI Assist" button — deps are
+  // selected.symptomBrief so it only changes when the selected slot changes.
+  const handleAIAssist = useCallback(async () => {
+    if (!selected?.symptomBrief) return
+    setAiLoading(true)
+    try {
+      const { data } = await axiosInstance.post('/bookings/ai-suggest', {
+        symptomBrief: selected.symptomBrief,
+      })
+      if (data.suggestion) setPrescription(data.suggestion)
+    } catch (_) {
+      // fail silently — doctor can still write manually
+    } finally {
+      setAiLoading(false)
+    }
+  }, [selected?.symptomBrief])
 
-  const StatCard = ({ icon: Icon, value, label, colorClass, delay }) => (
-    <motion.div 
+  // ── Complete consultation + queue PDF job ─────────────────────────────
+  // useCallback: deps are prescription, saved map, selected slot, viewDate.
+  const handleComplete = useCallback(async () => {
+    const currentPrescription = saved[selected?._id] || prescription
+    if (!currentPrescription.trim()) return
+    try {
+      const bookingId = selected?.bookingId
+      if (!bookingId) {
+        alert('Error: This slot is missing its booking reference. Try refreshing the schedule.')
+        return
+      }
+      await axiosInstance.post(`/bookings/complete/${bookingId}`, {
+        prescription: currentPrescription,
+      })
+      setSaved(p => ({ ...p, [selected._id]: currentPrescription }))
+      fetchSlots(viewDate)
+    } catch {
+      alert('Failed to complete consultation. Please try again.')
+    }
+  }, [prescription, saved, selected, viewDate, fetchSlots])
+
+  // ── Stat card component (defined outside render to avoid re-creation) ─
+  const StatCard = useCallback(({ icon: Icon, value, label, colorClass, delay }) => (
+    <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
       className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow"
     >
@@ -89,29 +153,29 @@ export default function DoctorDashboard() {
         <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{label}</div>
       </div>
     </motion.div>
-  )
+  ), [])
 
   return (
-    <DashboardLayout 
+    <DashboardLayout
       title={`Welcome, ${user?.name ?? 'Doctor'} 👋`}
       subtitle={`${user?.specialty ?? 'Specialist'} · Manage your schedule and patient consultations`}
     >
-      {/* Stats Grid */}
+      {/* Stats Grid — values come from useMemo(stats) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard icon={Calendar} value={stats.total} label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-primary/10 text-[#0284c7]" delay={0.1} />
-        <StatCard icon={Clock} value={stats.pending} label="Open Slots" colorClass="bg-amber-100 text-amber-600" delay={0.2} />
-        <StatCard icon={CheckCircle2} value={stats.done} label="Booked / Done" colorClass="bg-emerald-100 text-emerald-600" delay={0.3} />
+        <StatCard icon={Calendar}     value={stats.total}   label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-primary/10 text-[#0284c7]" delay={0.1} />
+        <StatCard icon={Clock}        value={stats.pending} label="Open Slots"     colorClass="bg-amber-100 text-amber-600"     delay={0.2} />
+        <StatCard icon={CheckCircle2} value={stats.done}    label="Booked / Done"  colorClass="bg-emerald-100 text-emerald-600" delay={0.3} />
       </div>
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 p-1.5 rounded-xl mb-8 w-fit">
         {[['schedule', 'My Schedule'], ['add', 'Add Slots']].map(([key, label]) => (
-          <button 
-            key={key} 
+          <button
+            key={key}
             className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${tab === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             onClick={() => setTab(key)}
           >
-            {key === 'add' && <PlusCircle size={16} />}
+            {key === 'add'      && <PlusCircle size={16} />}
             {key === 'schedule' && <Calendar size={16} />}
             {label}
           </button>
@@ -119,8 +183,9 @@ export default function DoctorDashboard() {
       </div>
 
       <AnimatePresence mode="wait">
+        {/* ── Add Slot Tab ── */}
         {tab === 'add' && (
-          <motion.div 
+          <motion.div
             key="add" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
             className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 max-w-lg"
           >
@@ -170,37 +235,43 @@ export default function DoctorDashboard() {
           </motion.div>
         )}
 
+        {/* ── Schedule Tab ── */}
         {tab === 'schedule' && (
-          <motion.div 
+          <motion.div
             key="schedule" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
           >
-            {/* Left Panel: Slot List */}
+            {/* Left Panel: Slot List — uses sortedSlots from useMemo */}
             <div className="lg:col-span-5 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col max-h-[600px]">
               <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="font-bold text-slate-800">Schedule</h3>
                 <input
-                  type="date" value={viewDate} onChange={e => { setViewDate(e.target.value); setSelected(null) }}
+                  type="date" value={viewDate}
+                  onChange={e => { setViewDate(e.target.value); setSelected(null) }}
                   className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50"
                 />
               </div>
 
               <div className="overflow-y-auto flex-1 p-3 space-y-2">
                 {loading ? (
-                   <div className="flex flex-col justify-center items-center h-48 space-y-3">
-                     <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-                     <p className="text-sm font-medium text-slate-500">Loading schedule...</p>
-                   </div>
-                ) : slots.length === 0 ? (
+                  <div className="flex flex-col justify-center items-center h-48 space-y-3">
+                    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <p className="text-sm font-medium text-slate-500">Loading schedule...</p>
+                  </div>
+                ) : sortedSlots.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 text-center px-4">
                     <Calendar size={32} className="text-slate-300 mb-3" />
                     <p className="text-sm font-medium text-slate-500 mb-4">No slots scheduled on this date.</p>
-                    <button className="px-4 py-2 bg-primary/10 text-[#0284c7] font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors" onClick={() => setTab('add')}>
+                    <button
+                      className="px-4 py-2 bg-primary/10 text-[#0284c7] font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors"
+                      onClick={() => setTab('add')}
+                    >
                       + Add a Slot
                     </button>
                   </div>
                 ) : (
-                  slots.map((slot) => {
+                  // sortedSlots is memoised — re-sorts only when slots array changes
+                  sortedSlots.map((slot) => {
                     const statusKey = slot.bookingStatus || (slot.isBooked ? 'booked' : 'pending')
                     const s = STATUS_MAP[statusKey] || STATUS_MAP.pending
                     const isSelected = selected?._id === slot._id
@@ -267,7 +338,7 @@ export default function DoctorDashboard() {
                     })()}
                   </div>
 
-                  {/* AI Brief */}
+                  {/* AI Symptom Brief */}
                   {selected.symptomBrief && (
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
@@ -290,14 +361,7 @@ export default function DoctorDashboard() {
                         </h3>
                         {selected.symptomBrief && !saved[selected._id] && (
                           <button
-                            onClick={async () => {
-                              setAiLoading(true)
-                              try {
-                                const { data } = await axiosInstance.post('/bookings/ai-suggest', { symptomBrief: selected.symptomBrief })
-                                if (data.suggestion) setPrescription(data.suggestion)
-                              } catch (_) {}
-                              finally { setAiLoading(false) }
-                            }}
+                            onClick={handleAIAssist}
                             disabled={aiLoading}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-[#0284c7] hover:bg-primary/20 font-bold text-xs rounded-lg transition-colors"
                           >
@@ -309,7 +373,7 @@ export default function DoctorDashboard() {
                           </button>
                         )}
                       </div>
-                      
+
                       {saved[selected._id] ? (
                         <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-emerald-900 text-sm leading-relaxed whitespace-pre-wrap mb-6">
                           {saved[selected._id]}
@@ -318,12 +382,11 @@ export default function DoctorDashboard() {
                         <textarea
                           value={prescription}
                           onChange={e => setPrescription(e.target.value)}
-                          placeholder="e.g. Tab Paracetamol 500mg - twice daily for 3 days&#10;Plenty of fluids and rest..."
+                          placeholder={`e.g. Tab Paracetamol 500mg - twice daily for 3 days\nPlenty of fluids and rest...`}
                           className="flex-1 w-full p-5 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700 resize-none mb-6 min-h-[150px]"
                         />
                       )}
 
-                      {/* Actions */}
                       <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t border-slate-100">
                         {!saved[selected._id] && (
                           <button
@@ -333,25 +396,9 @@ export default function DoctorDashboard() {
                             <CheckSquare size={18} /> Save Draft
                           </button>
                         )}
-                        
-                        <button 
-                          onClick={async () => {
-                            const currentPrescription = saved[selected._id] || prescription;
-                            if (!currentPrescription.trim()) return;
-                            try {
-                              const bookingId = selected.bookingId; 
-                              if (!bookingId) {
-                                alert('Error: This slot is missing its booking reference.');
-                                return;
-                              }
-                              await axiosInstance.post(`/bookings/complete/${bookingId}`, { prescription: currentPrescription });
-                              setSaved(p => ({ ...p, [selected._id]: currentPrescription }));
-                              // Refresh the slot view so the status updates to 'completed'
-                              fetchSlots(viewDate);
-                            } catch (err) {
-                              alert('Failed to complete consultation. Please try again.');
-                            }
-                          }}
+
+                        <button
+                          onClick={handleComplete}
                           disabled={!prescription.trim() && !saved[selected._id]}
                           className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${(!prescription.trim() && !saved[selected._id]) ? 'bg-slate-300 text-white cursor-not-allowed' : 'bg-[#075985] text-white shadow-sm'}`}
                         >
@@ -360,13 +407,12 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
                   )}
-                  
-                  {!selected.isBooked && (
-                     <div className="flex flex-col items-center justify-center flex-1 text-center opacity-60">
-                       <p className="text-sm font-medium text-slate-500">This slot is still open. Patients can book it from their dashboard.</p>
-                     </div>
-                  )}
 
+                  {!selected.isBooked && (
+                    <div className="flex flex-col items-center justify-center flex-1 text-center opacity-60">
+                      <p className="text-sm font-medium text-slate-500">This slot is still open. Patients can book it from their dashboard.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
