@@ -15,8 +15,8 @@ export function AuthProvider({ children }) {
     const { data } = await axiosInstance.post('/auth/login', { email, password })
     setUser(data.user)
     localStorage.setItem('aarogya_user', JSON.stringify(data.user))
-    localStorage.setItem('aarogya_token', data.token)
-    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+    localStorage.setItem('aarogya_token', data.accessToken)
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`
     return data.user
   }, [])
 
@@ -24,8 +24,8 @@ export function AuthProvider({ children }) {
     const { data } = await axiosInstance.post('/auth/register', payload)
     setUser(data.user)
     localStorage.setItem('aarogya_user', JSON.stringify(data.user))
-    localStorage.setItem('aarogya_token', data.token)
-    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+    localStorage.setItem('aarogya_token', data.accessToken)
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`
     return data.user
   }, [])
 

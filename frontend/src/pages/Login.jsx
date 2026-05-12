@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
@@ -32,7 +32,7 @@ const ROLES = [
 ]
 
 export default function Login() {
-  const { login, register } = useAuth()
+  const { user, login, register } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('select')
   const [selectedRole, setSelectedRole] = useState(null)
@@ -40,6 +40,13 @@ export default function Login() {
   const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      const role = ROLES.find(r => r.key === user.role)
+      navigate(role?.route || '/patient', { replace: true })
+    }
+  }, [user, navigate])
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role)
@@ -52,14 +59,11 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      let user
       if (isRegister) {
-        user = await register({ ...form, role: selectedRole.key })
+        await register({ ...form, role: selectedRole.key })
       } else {
-        user = await login(form.email, form.password)
+        await login(form.email, form.password)
       }
-      const role = ROLES.find(r => r.key === user.role)
-      navigate(role?.route || '/patient')
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Authentication failed. Please try again.')
     } finally {
