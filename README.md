@@ -1,136 +1,240 @@
 # AarogyaLink — Rural Telemedicine Scheduler
 
-> Project No. 11 · Health & Emergency · MERN Stack BTech Course — Group Project
+> **Project No. 11 · Health & Emergency · MERN Stack BTech**
+> Group 7 · Team Lead: Suhani Agarwal · Members: Gursneh Kaur, Aryaman Bohra, Nidhesh Soni
 
 ---
 
-## Group Details
-
-| | |
-|---|---|
-| Project Number | 11 |
-| Project Title | AarogyaLink — Rural Telemedicine Scheduler |
-| Group Number | 7 |
-| Team Lead | Suhani Agarwal |
-| Members | Gursneh Kaur, Aryaman Bohra, Nidhesh Soni |
-
----
-
-## The Real Problem
-
-India has over 600,000 villages. Most of them have no doctor. The nearest government hospital or district health centre is often 20–50 km away. A daily-wage farmer or a pregnant woman in a remote village cannot afford to travel that distance every time they need a consultation — losing a day's wage, arranging transport, and waiting for hours at an overcrowded OPD.
-
-ASHA workers (Accredited Social Health Activists) are the last mile of India's health system. They visit homes, track pregnancies, and guide patients — but they have no digital tool to help them book consultations on a patient's behalf.
-
-Meanwhile, doctors at district hospitals have no visibility into how many patients are waiting, who is next, or whether a slot was accidentally double-booked by two people clicking at the same time.
-
-AarogyaLink is built to fix exactly this. It is not a general-purpose telemedicine app. It is designed specifically for the rural public health context — where connectivity is low, users may not be tech-savvy, and the ASHA worker is often the bridge between the patient and the system.
-
----
-
-## What This Project Builds
-
-AarogyaLink is a full-stack web application where:
-
-- Patients in rural areas can browse available doctors and book a video consultation slot
-- ASHA workers can log in and book slots on behalf of the patients they are tracking
-- Doctors set their own availability and manage their appointment queue from a dashboard
-- After a consultation, the doctor uploads a prescription which the system converts into a downloadable PDF
-- Patients and ASHAs can see their live queue position in real time — no refreshing, no guessing
-
-The system is designed to handle a situation that happens constantly in real public health systems: two people trying to book the last available slot at the same moment. Without careful engineering, both could succeed and the doctor ends up double-booked. This project solves that at the database level, not just the UI level.
-
----
-
-## What the Project Technically Demands
-
-### Concurrent Slot Booking Without Overselling
-When two patients (or an ASHA and a patient) attempt to book the same last slot simultaneously, only one must succeed. This is handled using MongoDB's `findOneAndUpdate` with a precondition `{ isBooked: false }` — making the check and the update a single atomic operation. The losing request receives a clear "slot no longer available" response. This is not a UI trick — it is enforced at the database level.
-
-### Redis Caching for Slot Availability
-Doctor slot availability is read far more often than it is written. Fetching it from MongoDB on every request is wasteful. Available slots are cached in Redis with immediate invalidation the moment a booking is confirmed. This keeps response times fast even under high load and teaches the cache-aside pattern with real invalidation logic.
-
-### Four-Role Authentication System
-The platform has four distinct types of users — Patient, Doctor, ASHA, and Admin — each with a completely different set of permissions and views. A single JWT-based authentication system serves all four, with role-specific middleware guarding every protected route. The ASHA role is particularly important: it can act on behalf of patients, which requires careful authorisation logic to prevent misuse.
-
-### PDF Prescription Generation Without Blocking the Server
-Generating a PDF is a CPU-intensive and file I/O heavy operation. Running it on Node's main thread would block the event loop and slow down every other request on the server. Prescriptions are generated using `pdfkit` inside a Node.js Worker Thread — the main thread hands off the job and responds to the client immediately, while the PDF is prepared in the background.
-
-### Appointment Queue Using Redis Sorted Sets
-A doctor's upcoming appointments need to be retrieved quickly and in chronological order. Storing them in a Redis Sorted Set keyed by appointment timestamp allows O(log N) retrieval of the next N appointments without touching MongoDB on every queue check. This is how production scheduling systems handle high-frequency reads.
-
-### Live Queue Position via Server-Sent Events
-Rather than making patients repeatedly refresh the page to see their queue position, the server pushes updates in real time using Server-Sent Events (SSE). When a doctor marks a consultation as complete and the queue moves forward, every waiting patient's screen updates automatically. SSE is chosen over WebSockets here because the communication is one-directional — the server pushes, the client only listens.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React.js |
-| Backend | Node.js, Express.js |
-| Database | MongoDB |
-| Cache & Queue | Redis |
-| Authentication | JSON Web Tokens (JWT) |
-| PDF Generation | pdfkit inside Node.js Worker Thread |
-| Real-time Updates | Server-Sent Events (SSE) |
-
----
-
-## MongoDB Collections
-
-**Users** — All four roles stored in a single collection with a `role` field controlling access.
-
-**Slots** — Each document represents one time slot for one doctor, with an `isBooked` boolean used in atomic update operations.
-
-**Appointments** — Confirmed bookings linking a patient (or ASHA-on-behalf), a doctor, and a slot.
-
-**Prescriptions** — Stores the generated PDF path and metadata, linked to a completed appointment.
-
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js v18+
-- MongoDB (local or Atlas)
-- Redis (local or Redis Cloud)
-
-### Setup
+## 🚀 Quick Start (One Command)
 
 ```bash
-git clone https://github.com/[your-username]/aarogyalink-telemedicine.git
+# 1. Clone the repo
+git clone https://github.com/Suhaniagarwal5/aarogyalink-telemedicine.git
 cd aarogyalink-telemedicine
 
-# Backend
-cd backend && npm install
+# 2. Start MongoDB + Redis via Docker
+docker compose up -d mongo redis
 
-# Frontend
-cd ../frontend && npm install
+# 3. Install & seed backend
+cd backend
+npm install
+npm run seed        # creates test users + 42 slots (7 days × 6 slots/day)
+npm run dev         # starts backend on http://localhost:5005
+
+# 4. Install & start frontend (new terminal)
+cd ../frontend
+npm install
+npm run dev         # starts frontend on http://localhost:5173
 ```
 
-### Environment Variables
+Open `http://localhost:5173` — done.
 
-Create a `.env` file in the `backend/` directory:
+---
 
-```env
-PORT=3000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-REDIS_URL=redis://localhost:6379
-```
-
-### Run
+## 🐳 Full Stack via Docker Compose (all 4 services)
 
 ```bash
-# Backend
-cd backend && npm run dev
+docker compose up --build
+```
 
-# Frontend (new terminal)
-cd frontend && npm run dev
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:5005 |
+| MongoDB | localhost:27017 |
+| Redis | localhost:6379 |
+
+---
+
+## 🔑 Environment Variables
+
+Copy `.env.example` to `backend/.env` and fill in:
+
+```env
+# Server
+NODE_ENV=development
+PORT=5005
+UV_THREADPOOL_SIZE=16
+
+# Database
+MONGO_URI=mongodb://localhost:27017/aarogyalink   # or your Atlas URI
+
+# Cache
+REDIS_URL=redis://localhost:6379
+
+# Auth
+JWT_SECRET=your_jwt_secret_here
+JWT_REFRESH_SECRET=your_refresh_secret_here
+
+# AI (Anthropic Claude)
+ANTHROPIC_API_KEY=sk-ant-...your-key...
+CLAUDE_API_KEY=sk-ant-...same-key...
+
+# Email (Gmail App Password)
+EMAIL_USER=your@gmail.com
+EMAIL_PASS=your-app-password-16chars
+```
+
+Frontend `.env` (optional — defaults to localhost:5005):
+```env
+VITE_API_BASE_URL=http://localhost:5005/api
 ```
 
 ---
 
-*MERN Stack BTech Course · Group Project 11 · AarogyaLink — Rural Telemedicine Scheduler*
+## 🧪 Test Accounts (after `npm run seed`)
+
+| Role | Email | Password |
+|---|---|---|
+| Patient | ravi@patient.com | password123 |
+| Patient | meena@patient.com | password123 |
+| Patient | gopal@patient.com | password123 |
+| Doctor | priya@doctor.com | password123 |
+| Doctor | arjun@doctor.com | password123 |
+| ASHA Worker | sunita@asha.com | password123 |
+| Admin | admin@hospital.com | password123 |
+
+---
+
+## 📁 Project Structure
+
+```
+aarogyalink-telemedicine/
+├── backend/
+│   ├── src/
+│   │   ├── config/          # db.js, redis.js, env.js
+│   │   ├── models/          # User, Doctor, Slot, Booking, AuditLog
+│   │   ├── controllers/     # booking, prescription, user
+│   │   ├── routes/          # auth, slot, booking, user, admin, sse, prescription
+│   │   ├── middleware/      # auth.js (JWT), rbac.js (RBAC), errorHandler.js
+│   │   ├── services/
+│   │   │   ├── ai/          # Claude triage.service.js
+│   │   │   ├── mail/        # mail.service.js, reminder.service.js
+│   │   │   ├── pdf/         # pdf generator (pdfkit)
+│   │   │   ├── queue/       # BullMQ pdf.queue.js
+│   │   │   └── sse/         # queue.sse.js (SSE manager)
+│   │   ├── workers/         # pdf.worker.js, pdf.thread.js, pdf.processor.js
+│   │   └── scripts/         # seed.js
+│   ├── tests/               # e2e.test.js, load_test.js, eventloop_lag.js, threadpool-benchmark.js
+│   ├── architecture_notes.md
+│   ├── load_test_results.md
+│   └── threadpool_results.md
+├── frontend/
+│   └── src/
+│       ├── api/             # axiosInstance.js (silent JWT refresh)
+│       ├── components/      # DashboardLayout, Navbar
+│       ├── context/         # AuthContext.jsx
+│       ├── hooks/           # useAuth.js, useQueuePosition.js
+│       └── pages/
+│           ├── Patient/     # PatientDashboard.jsx
+│           ├── Doctor/      # DoctorDashboard.jsx
+│           ├── ASHA/        # ASHADashboard.jsx
+│           └── Admin/       # AdminDashboard.jsx
+└── docker-compose.yml
+```
+
+---
+
+## 🧱 Architecture Overview
+
+```
+Browser (React)
+    │
+    ├─ Axios + JWT interceptor (silent refresh on 401)
+    │
+    ▼
+Express API (Node.js — port 5005)
+    │
+    ├── Auth middleware (JWT verify) → RBAC middleware (role check)
+    │
+    ├── /api/slots       → Redis cache-aside → MongoDB Slot collection
+    ├── /api/bookings    → Atomic findOneAndUpdate → Redis sorted queue
+    │                     → Claude AI triage → SSE broadcast → BullMQ job
+    ├── /api/auth        → JWT access (15min) + refresh (7d httpOnly cookie)
+    ├── /api/admin       → MongoDB aggregation pipeline
+    └── /api/sse         → Server-Sent Events (long-lived HTTP stream)
+         │
+         ├── Redis (ioredis) — slot cache + appointment queue sorted sets
+         ├── MongoDB (mongoose) — all persistent data + compound indexes
+         ├── BullMQ job queue → pdf.worker.js → pdf.thread.js (worker_thread)
+         └── Nodemailer → Gmail SMTP (confirmation + reminder emails)
+```
+
+---
+
+## 🎓 Teacher Checklist — Concept Map
+
+| Concept | File / Location |
+|---|---|
+| **Race condition fix** | `booking.controller.js` → `findOneAndUpdate({isBooked:false})` |
+| **Redis cache-aside + TTL** | `slot.routes.js` → `client.get/set` with `EX:300` |
+| **Redis sorted set (queue)** | `booking.controller.js` → `client.zAdd/zRange/zRem` |
+| **JWT + refresh token** | `auth.routes.js`, `middleware/auth.js` |
+| **4-role RBAC** | `middleware/rbac.js` → `checkRole([...])` |
+| **Axios silent refresh** | `frontend/src/api/axiosInstance.js` |
+| **useMemo** | `PatientDashboard.jsx`, `DoctorDashboard.jsx`, `AdminDashboard.jsx` |
+| **useCallback** | `PatientDashboard.jsx`, `DoctorDashboard.jsx`, `ASHADashboard.jsx`, `AdminDashboard.jsx` |
+| **SSE (server-sent events)** | `sse.routes.js`, `services/sse/queue.sse.js` |
+| **Worker thread (libuv)** | `workers/pdf.worker.js` + `workers/pdf.thread.js` |
+| **BullMQ job queue** | `services/queue/pdf.queue.js` + `workers/pdf.worker.js` |
+| **UV_THREADPOOL_SIZE** | `src/server.js` line 2, tested in `tests/threadpool-benchmark.js` |
+| **Claude API triage** | `services/ai/triage.service.js` → `client.messages.create` |
+| **MongoDB aggregation** | `admin.routes.js` → `$group + $sum + $lookup + $sort` |
+| **Compound indexes** | `models/Slot.js`, `models/Booking.js` |
+| **Docker Compose** | `docker-compose.yml` |
+| **Load testing** | `tests/load_test.js` (autocannon 200 connections) |
+| **Event loop lag** | `tests/eventloop_lag.js` (blocking vs worker_thread) |
+
+---
+
+## 🔬 Running Tests
+
+```bash
+cd backend
+
+# E2E test (full booking flow — requires running server + DB)
+npm run test:e2e
+
+# Load test (autocannon — requires running server)
+node tests/load_test.js
+
+# Event loop lag benchmark
+node tests/eventloop_lag.js
+
+# UV_THREADPOOL_SIZE benchmark
+node tests/threadpool-benchmark.js
+
+# Unit/integration tests
+npm test
+```
+
+---
+
+## 📊 Performance Results
+
+See [`backend/load_test_results.md`](backend/load_test_results.md) for:
+- autocannon 200-connection load test results
+- Event loop lag before/after worker thread offload
+- UV_THREADPOOL_SIZE tuning (4 → 16) results
+
+See [`backend/threadpool_results.md`](backend/threadpool_results.md) for threadpool benchmark details.
+
+---
+
+## 🌐 Deployment
+
+**Backend → Railway:**
+1. Connect GitHub repo to Railway
+2. Set root directory to `backend/`
+3. Add all env variables from `.env.example`
+4. Set `MONGO_URI` to MongoDB Atlas URI
+5. Set `REDIS_URL` to Railway Redis plugin URL
+
+**Frontend → Vercel:**
+1. Connect GitHub repo to Vercel
+2. Set root directory to `frontend/`
+3. Add `VITE_API_BASE_URL=https://your-backend.railway.app/api`
+
+---
+
+*AarogyaLink — Built for the last mile of India's rural health system.*

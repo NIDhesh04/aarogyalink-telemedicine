@@ -31,15 +31,16 @@ services:
     build: ./backend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "5005:5005"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=5005
       - MONGO_URI=mongodb://mongo:27017/aarogyalink
       - REDIS_URL=redis://redis:6379
       - REDIS_HOST=redis
+      - UV_THREADPOOL_SIZE=16
     depends_on:
       mongo:
         condition: service_healthy
@@ -53,7 +54,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=http://localhost:5005/api
     depends_on:
       - backend
 

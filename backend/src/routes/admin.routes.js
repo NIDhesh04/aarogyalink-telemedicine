@@ -6,11 +6,14 @@ const AuditLog = require('../models/AuditLog');
 const { auth } = require('../middleware/auth');
 const { checkRole } = require('../middleware/rbac');
 
+// Apply auth + admin role to ALL routes in this file
+router.use(auth, checkRole(['admin']));
+
 /**
  * GET /api/admin/analytics
  * Weekly booking counts using MongoDB aggregation pipeline
  */
-router.get('/analytics', auth, checkRole(['admin']), async (req, res) => {
+router.get('/analytics', async (req, res) => {
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -46,7 +49,7 @@ router.get('/analytics', auth, checkRole(['admin']), async (req, res) => {
  * GET /api/admin/schedule/:doctorId
  * Daily schedule report using aggregation (slots + bookings joined)
  */
-router.get('/schedule/:doctorId', auth, checkRole(['admin']), async (req, res) => {
+router.get('/schedule/:doctorId', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const report = await Booking.aggregate([
@@ -91,7 +94,7 @@ router.get('/schedule/:doctorId', auth, checkRole(['admin']), async (req, res) =
  * GET /api/admin/audit-log
  * Recent audit log entries
  */
-router.get('/audit-log', auth, checkRole(['admin']), async (req, res) => {
+router.get('/audit-log', async (req, res) => {
   try {
     const logs = await AuditLog.find()
       .populate('performedBy', 'name role')
@@ -107,7 +110,7 @@ router.get('/audit-log', auth, checkRole(['admin']), async (req, res) => {
  * GET /api/admin/stats
  * High-level platform stats
  */
-router.get('/stats', auth, checkRole(['admin']), async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const [totalDoctors, totalBookings, completedToday] = await Promise.all([
       User.countDocuments({ role: 'doctor' }),

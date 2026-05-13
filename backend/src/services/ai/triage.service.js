@@ -1,56 +1,115 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Anthropic = require('@anthropic-ai/sdk');
 
-/**
- * AI Triage Service (Gemini Edition)
- * Managed by: Teammate 4 (Group Lead)
- * Purpose: Convert raw patient text into structured clinical data for doctors.
- */
-
-// Initialize Gemini with the free API key from your .env
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Teacher checklist: "Claude API (/v1/messages): prompt engineering for clinical triage"
+// Uses Anthropic Claude claude-3-haiku-20240307 (fast + cost-efficient for triage)
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
+});
 
 /**
  * Converts raw patient symptoms into a structured clinical brief.
- * @param {string} rawSymptoms - The informal text provided by the patient.
- * @returns {Promise<string>} - The structured clinical brief (Markdown formatted).
+ * Called inside createBooking before the Booking document is created.
+ *
+ * @param {string} rawSymptoms - Informal text from the patient.
+ * @returns {Promise<string>} - Structured clinical brief for the doctor.
  */
 const generateClinicalBrief = async (rawSymptoms) => {
-  // Guard clause for empty or missing input
   if (!rawSymptoms || rawSymptoms.trim().length === 0) {
     return 'No symptoms reported by patient.';
   }
 
   try {
-    // Using gemini-1.5-flash for high speed and zero cost[cite: 26, 40]
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: `You are a clinical triage assistant for rural telemedicine. 
-        Your task is to take raw, informal patient symptoms and convert them into a structured, professional clinical brief for a doctor.
-        Focus on:
-        1. Chief Complaint
-        2. Duration
-        3. Severity
-        4. Key Symptoms
-        Keep it concise and objective. If information is missing, state 'Not reported'.`
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 512,
+      system: `You are a senior clinical triage officer working in a rural telemedicine platform in India.
+Your job is to convert a patient's informal description of their symptoms into a structured, professional medical brief that a qualified district hospital doctor will read before the consultation.
+
+Structure your output EXACTLY as follows:
+**Chief Complaint:** [1 sentence summary]
+**Reported Duration:** [how long they've had symptoms]
+**Severity:** [Mild / Moderate / Severe based on description]
+**Key Symptoms:** [Bulleted list of all reported symptoms]
+**Red Flags / Urgent Signs:** [Any alarming symptoms that need immediate attention, or "None reported"]
+**Suggested Priority:** [Routine / Urgent / Emergency]
+
+Be concise, clinical, and objective. If information is not mentioned, write "Not reported". Do NOT add any greetings or extra commentary.`,
+      messages: [
+        {
+          role: 'user',
+          content: `Patient's own words: "${rawSymptoms}"\n\nGenerate the clinical brief:`,
+        },
+      ],
     });
 
-    const prompt = `Patient symptoms: "${rawSymptoms}"`;
-
-    // Generate content from Gemini
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    return text;
+    return message.content[0].text;
   } catch (error) {
-    console.error('Gemini Triage Service Error:', error);
-    
-    // Fallback logic: Ensure the doctor still sees the patient's original words
-    // even if the AI service is down or rate-limited.[cite: 26]
-    return `[System Note: AI Triage Unavailable] Raw Symptoms: ${rawSymptoms}`;
+    console.error('Claude Triage Service Error:', error.message);
+    // Graceful fallback — booking still succeeds even if AI is unavailable
+    return `[AI Triage Unavailable] Patient reported: ${rawSymptoms}`;
+  }
+};
+
+/**
+ * Generates a detailed prescription suggestion for the doctor.
+ * Called from POST /api/bookings/ai-suggest when doctor clicks "AI Assist".
+ *
+ * @param {string} symptomBrief - The structured clinical brief.
+ * @returns {Promise<string>} - Suggested prescription text for doctor review.
+ */
+const generatePrescriptionSuggestion = async (symptomBrief) => {
+  if (!symptomBrief || symptomBrief.trim().length === 0) {
+    return '';
+  }
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 800,
+      system: `You are an AI clinical decision support system assisting a qualified MBBS doctor in a rural telemedicine setting in India.
+
+Based on the patient's structured clinical brief, generate a detailed, evidence-based prescription suggestion that the doctor can review and modify.
+
+Your response must follow this EXACT format:
+
+**Diagnosis (Provisional):** [Most likely diagnosis based on symptoms]
+
+**Medications:**
+1. [Drug name] [Dosage] — [Frequency] for [Duration] | Indication: [why]
+2. [Drug name] [Dosage] — [Frequency] for [Duration] | Indication: [why]
+(add more as needed, use standard generic names)
+
+**General Advice:**
+- [Lifestyle / diet / rest recommendations]
+- [Activity restrictions if any]
+- [Hydration / nutrition advice]
+
+**Follow-up:** [When to return / what to monitor]
+
+**⚠️ Warning Signs — Seek Emergency Care If:**
+- [Symptom that requires immediate hospital visit]
+- [Another red flag]
+
+---
+⚕️ AI-GENERATED SUGGESTION — Doctor must review, verify, and modify before finalizing.
+
+Use only standard, widely available generic medications suitable for rural India. Keep dosages conservative and safe.`,
+      messages: [
+        {
+          role: 'user',
+          content: `Patient Clinical Brief:\n${symptomBrief}\n\nGenerate the prescription suggestion for the doctor to review:`,
+        },
+      ],
+    });
+
+    return message.content[0].text;
+  } catch (error) {
+    console.error('Claude Prescription Suggestion Error:', error.message);
+    return '';
   }
 };
 
 module.exports = {
   generateClinicalBrief,
+  generatePrescriptionSuggestion,
 };
