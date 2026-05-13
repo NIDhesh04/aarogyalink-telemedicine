@@ -2,10 +2,16 @@ const express = require('express');
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
 const { upload } = require('../middleware/upload');
-const { uploadDoctorPhoto } = require('../controllers/user.controller');
+const { uploadDoctorPhoto, getProfile, updateProfile } = require('../controllers/user.controller');
 const { auth } = require('../middleware/auth');
 const { checkRole } = require('../middleware/rbac');
 const router = express.Router();
+
+// ── GET /api/users/profile ─────────────────────────────────────────────────
+router.get('/profile', auth, getProfile);
+
+// ── PUT /api/users/profile ─────────────────────────────────────────────────
+router.put('/profile', auth, updateProfile);
 
 // ── GET /api/users/doctors ─────────────────────────────────────────────────
 // Returns all doctors (joins User + Doctor for specialty & photo).
