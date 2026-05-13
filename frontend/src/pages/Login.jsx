@@ -41,7 +41,7 @@ export default function Login() {
       const role = ROLES.find(r => r.key === user.role)
       navigate(role?.route || '/patient')
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong. Please try again.')
+      setError(err.response?.data?.message || err.response?.data?.error || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }

@@ -103,19 +103,19 @@ Rather than making patients repeatedly refresh the page to see their queue posit
 git clone https://github.com/[your-username]/aarogyalink-telemedicine.git
 cd aarogyalink-telemedicine
 
-# Server
-cd server && npm install
+# Backend
+cd backend && npm install
 
-# Client
-cd ../client && npm install
+# Frontend
+cd ../frontend && npm install
 ```
 
 ### Environment Variables
 
-Create a `.env` file in the `server/` directory:
+Create a `.env` file in the `backend/` directory:
 
 ```env
-PORT=5000
+PORT=3000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
 REDIS_URL=redis://localhost:6379
@@ -125,10 +125,10 @@ REDIS_URL=redis://localhost:6379
 
 ```bash
 # Backend
-cd server && npm run dev
+cd backend && npm run dev
 
 # Frontend (new terminal)
-cd client && npm start
+cd frontend && npm run dev
 ```
 
 ---
