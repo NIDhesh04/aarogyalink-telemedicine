@@ -4,6 +4,7 @@ import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import { Users, AlertTriangle, ClipboardCheck, Calendar, Clock, User, ChevronRight, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 // useCallback: patient status is derived from their last booking —
 // this helper is memoised so it isn't recreated on every render
@@ -28,6 +29,7 @@ export default function ASHADashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [slots, setSlots] = useState([])
+  const { t } = useTranslation()
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -89,15 +91,15 @@ export default function ASHADashboard() {
 
   return (
     <DashboardLayout
-      title="ASHA Dashboard"
-      subtitle={`Community Health Worker: ${user?.name} · Rural Outreach & Scheduling`}
+      title={t('ASHA Worker')}
+      subtitle={`Community Health Worker: ${user?.name} · ${t('Book on behalf of patients, manage local community caseload')}`}
     >
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
-          { icon: Users,         label: 'Patients in Caseload', value: patients.length,  color: 'text-amber-700 bg-amber-50 border-amber-100' },
-          { icon: AlertTriangle, label: 'Critical Cases',        value: criticalCount,    color: 'text-red-700 bg-red-50 border-red-100' },
-          { icon: ClipboardCheck,label: 'Follow-ups Needed',     value: followupCount,    color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+          { icon: Users,         label: t('Patients in Caseload'), value: patients.length,  color: 'text-amber-700 bg-amber-50 border-amber-100' },
+          { icon: AlertTriangle, label: t('Critical Cases'),        value: criticalCount,    color: 'text-red-700 bg-red-50 border-red-100' },
+          { icon: ClipboardCheck,label: t('Follow-ups Needed'),     value: followupCount,    color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 flex items-center gap-4 shadow-sm transition-colors">
@@ -116,7 +118,7 @@ export default function ASHADashboard() {
         {/* Patient Selection List */}
         <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm transition-colors">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Assigned Patients</h2>
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('Assigned Patients')}</h2>
             <button
               onClick={fetchPatients}
               className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
@@ -156,7 +158,7 @@ export default function ASHADashboard() {
                         </div>
                         <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{p.name}</span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.class}`}>{cfg.label}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${cfg.class}`}>{t(cfg.label)}</span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 ml-11">{p.email}</p>
                   </button>
@@ -202,9 +204,9 @@ export default function ASHADashboard() {
               <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Book for {selectedPatient.name}</h2>
+                    <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('Book for')} {selectedPatient.name}</h2>
                     <p className="text-xs text-slate-400 font-medium">
-                      {selectedPatient.email} · Role: {selectedPatient.role}
+                      {selectedPatient.email} · {t('Role')}: {t(selectedPatient.role)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -213,7 +215,7 @@ export default function ASHADashboard() {
                 </div>
 
                 <div className="p-6 flex flex-col flex-1">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Available District Hospital Slots</h3>
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">{t('Available District Hospital Slots')}</h3>
 
                   {error && (
                     <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200 mb-4">
@@ -259,7 +261,7 @@ export default function ASHADashboard() {
                     {loading ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Confirming...</>
                     ) : (
-                      <>Confirm Appointment for {selectedPatient.name} <ChevronRight size={18} /></>
+                      <>{t('Confirm Appointment')} <ChevronRight size={18} /></>
                     )}
                   </button>
                 </div>

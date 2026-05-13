@@ -4,6 +4,7 @@ import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import { useQueuePosition } from '../../hooks/useQueuePosition'
+import { useTranslation } from 'react-i18next'
 import { Calendar, CheckCircle, Hash, Clock, User, AlertCircle, Activity, Download, ChevronRight, Star, X } from 'lucide-react'
 
 export default function PatientDashboard() {
@@ -14,6 +15,7 @@ export default function PatientDashboard() {
   const [booked, setBooked] = useState(false)
   const [bookedData, setBookedData] = useState(null)
   const [tab, setTab] = useState('book')
+  const { t } = useTranslation()
 
   const [slots, setSlots] = useState([])
   const [bookings, setBookings] = useState([])
@@ -144,15 +146,15 @@ export default function PatientDashboard() {
   return (
     <>
     <DashboardLayout
-      title={`Welcome, ${user?.name ?? 'Patient'}`}
-      subtitle="Book a consultation or view your appointment history"
+      title={`${t('Welcome, ')} ${user?.name ?? 'Patient'}`}
+      subtitle={t('Book a consultation or view your appointment history')}
     >
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
-          { icon: Calendar,     value: bookingStats.upcoming,           label: 'Scheduled Appointments',   color: 'text-sky-700 bg-sky-50 border-sky-100' },
-          { icon: CheckCircle,  value: bookingStats.completed,          label: 'Completed Consultations',  color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-          { icon: Hash,         value: bookedData?.queuePos ?? '—',     label: 'Current Queue Position',   color: 'text-violet-700 bg-violet-50 border-violet-100' },
+          { icon: Calendar,     value: bookingStats.upcoming,           label: t('Scheduled Appointments'),   color: 'text-sky-700 bg-sky-50 border-sky-100' },
+          { icon: CheckCircle,  value: bookingStats.completed,          label: t('Completed Consultations'),  color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+          { icon: Hash,         value: bookedData?.queuePos ?? '—',     label: t('Current Queue Position'),   color: 'text-violet-700 bg-violet-50 border-violet-100' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 flex items-center gap-4 transition-colors">
@@ -169,7 +171,7 @@ export default function PatientDashboard() {
 
       {/* Tab bar */}
       <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 w-fit mb-6 bg-white dark:bg-slate-900 transition-colors">
-        {[['book', 'Book Consultation'], ['history', 'My Appointments']].map(([key, label]) => (
+        {[['book', t('Book Consultation')], ['history', t('My Appointments')]].map(([key, label]) => (
           <button key={key}
             className={`px-5 py-2 text-sm font-semibold rounded-md transition-all ${tab === key ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             onClick={() => setTab(key)}
@@ -187,12 +189,12 @@ export default function PatientDashboard() {
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-colors">
               <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                 <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Calendar size={16} className="text-slate-400" /> Select Date & Available Slot
+                  <Calendar size={16} className="text-slate-400" /> {t('Select Date & Available Slot')}
                 </h2>
               </div>
               <div className="p-6 flex flex-col gap-4 flex-1">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Appointment Date</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{t('Appointment Date')}</label>
                   <input type="date" value={selectedDate}
                     min={new Date().toISOString().split('T')[0]}
                     onChange={e => setSelectedDate(e.target.value)}
@@ -204,12 +206,12 @@ export default function PatientDashboard() {
                   {loadingSlots ? (
                     <div className="flex flex-col items-center justify-center h-40 gap-2">
                       <div className="w-6 h-6 border-2 border-slate-200 border-t-[#0284c7] rounded-full animate-spin" />
-                      <p className="text-xs text-slate-400 font-medium">Loading slots...</p>
+                      <p className="text-xs text-slate-400 font-medium">{t('Loading slots...')}</p>
                     </div>
                   ) : sortedSlots.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 rounded-lg border border-dashed border-slate-200 bg-slate-50">
                       <Calendar size={24} className="text-slate-300 mb-2" />
-                      <p className="text-sm font-medium text-slate-400">No slots available on this date.</p>
+                      <p className="text-sm font-medium text-slate-400">{t('No slots available on this date.')}</p>
                     </div>
                   ) : (
                     // sortedSlots is memoised — only re-sorted when slots array changes
@@ -273,9 +275,9 @@ export default function PatientDashboard() {
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
                     <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                       <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                        <Activity size={16} className="text-slate-400" /> Describe Your Symptoms
+                        <Activity size={16} className="text-slate-400" /> {t('Describe Your Symptoms')}
                       </h2>
-                      <p className="text-xs text-slate-400 mt-0.5">Our AI will structure this into a clinical brief for the doctor.</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t('Our AI will structure this into a clinical brief for the doctor.')}</p>
                     </div>
                     <div className="p-6 flex flex-col flex-1 gap-4">
                       {error && (
@@ -285,7 +287,7 @@ export default function PatientDashboard() {
                       )}
 
                       <textarea value={symptom} onChange={e => setSymptom(e.target.value)}
-                        placeholder="Describe your symptoms in plain language, e.g. I have had a fever of 101°F for 3 days with sore throat and body ache..."
+                        placeholder={t('Describe your symptoms in plain language, e.g. I have had a fever of 101°F for 3 days with sore throat and body ache...')}
                         className="flex-1 w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm text-slate-700 dark:text-slate-200 resize-none min-h-[140px] transition-all"
                       />
 
@@ -299,7 +301,7 @@ export default function PatientDashboard() {
                         </div>
                       ) : (
                         <div className="p-3.5 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-center">
-                          <p className="text-sm text-slate-400 font-medium">Select a slot from the panel on the left.</p>
+                          <p className="text-sm text-slate-400 font-medium">{t('Select a slot from the panel on the left.')}</p>
                         </div>
                       )}
 
@@ -308,9 +310,9 @@ export default function PatientDashboard() {
                         className={`w-full py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all ${(!selectedSlot || !symptom.trim() || loadingBook) ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed' : 'bg-[#075985] text-white hover:bg-[#0369a1] shadow-sm hover:shadow-md'}`}
                       >
                         {loadingBook ? (
-                          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Booking...</>
+                          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t('Booking...')}</>
                         ) : (
-                          <>Confirm Appointment <ChevronRight size={16} /></>
+                          <>{t('Confirm Appointment')} <ChevronRight size={16} /></>
                         )}
                       </button>
                     </div>

@@ -7,6 +7,7 @@ import {
   Calendar, CheckCircle2, Clock, User as UserIcon, AlertCircle,
   PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2, Star
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 const STATUS_MAP = {
   pending:   { bg: 'bg-amber-100 dark:bg-amber-900/20',   color: 'text-amber-600 dark:text-amber-400',   label: 'Open' },
@@ -31,6 +32,7 @@ export default function DoctorDashboard() {
   const [saved, setSaved] = useState({})
   const [loading, setLoading] = useState(true)
   const [ratingData, setRatingData] = useState({ average: 0, count: 0 })
+  const { t } = useTranslation()
 
   const [newSlot, setNewSlot] = useState({ date: '', time: '', startTime: '', endTime: '' })
   const [adding, setAdding] = useState(false)
@@ -168,7 +170,7 @@ export default function DoctorDashboard() {
     <DashboardLayout
       title={
         <div className="flex items-center gap-4">
-          <span className="dark:text-white">Welcome, {user?.name ?? 'Doctor'} 👋</span>
+          <span className="dark:text-white">{t('Welcome, ')} {user?.name ?? 'Doctor'} 👋</span>
           {ratingData.count > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 rounded-full text-sm">
               <Star size={16} className="text-amber-500 fill-amber-500" />
@@ -178,18 +180,18 @@ export default function DoctorDashboard() {
           )}
         </div>
       }
-      subtitle={`${user?.specialty ?? 'Specialist'} · Manage your schedule and patient consultations`}
+      subtitle={`${user?.specialty ?? 'Specialist'} · ${t('Manage schedule, review clinical briefs, issue prescriptions')}`}
     >
       {/* Stats Grid — values come from useMemo(stats) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard icon={Calendar}     value={stats.total}   label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-sky-100 dark:bg-sky-900/20 text-[#0284c7] dark:text-[#38bdf8]" delay={0.1} />
-        <StatCard icon={Clock}        value={stats.pending} label="Open Slots"     colorClass="bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"     delay={0.2} />
-        <StatCard icon={CheckCircle2} value={stats.done}    label="Booked / Done"  colorClass="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" delay={0.3} />
+        <StatCard icon={Calendar}     value={stats.total}   label={t('Slots on Today')} colorClass="bg-sky-100 dark:bg-sky-900/20 text-[#0284c7] dark:text-[#38bdf8]" delay={0.1} />
+        <StatCard icon={Clock}        value={stats.pending} label={t('Open Slots')}     colorClass="bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"     delay={0.2} />
+        <StatCard icon={CheckCircle2} value={stats.done}    label={t('Booked / Done')}  colorClass="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" delay={0.3} />
       </div>
 
       {/* Tabs */}
       <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1.5 rounded-xl mb-8 w-fit transition-colors">
-        {[['schedule', 'My Schedule'], ['add', 'Add Slots']].map(([key, label]) => (
+        {[['schedule', t('My Schedule')], ['add', t('Add Slots')]].map(([key, label]) => (
           <button
             key={key}
             className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${tab === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
@@ -264,7 +266,7 @@ export default function DoctorDashboard() {
             {/* Left Panel: Slot List — uses sortedSlots from useMemo */}
             <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[600px] transition-colors">
               <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                <h3 className="font-bold text-slate-800 dark:text-slate-200">Schedule</h3>
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">{t('Schedule')}</h3>
                 <input
                   type="date" value={viewDate}
                   onChange={e => { setViewDate(e.target.value); setSelected(null) }}
@@ -332,8 +334,8 @@ export default function DoctorDashboard() {
                   <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mb-4">
                     <Activity size={32} />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No Consultation Selected</h3>
-                  <p className="text-sm font-medium text-slate-500 max-w-sm">Select a slot from your schedule on the left to view patient details and write prescriptions.</p>
+                  <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">{t('No Consultation Selected')}</h3>
+                  <p className="text-sm font-medium text-slate-500 max-w-sm">{t('Select a slot from your schedule on the left to view patient details and write prescriptions.')}</p>
                 </div>
               ) : (
                 <div className="p-8 flex flex-col h-full">
@@ -377,7 +379,7 @@ export default function DoctorDashboard() {
                     <div className="flex flex-col flex-1">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide flex items-center gap-2">
-                          <FileText size={16} className="text-slate-400" /> Write Prescription
+                          <FileText size={16} className="text-slate-400" /> {t('Write Prescription')}
                         </h3>
                         {selected.symptomBrief && !saved[selected._id] && (
                           <button
@@ -422,7 +424,7 @@ export default function DoctorDashboard() {
                           disabled={!prescription.trim() && !saved[selected._id]}
                           className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${(!prescription.trim() && !saved[selected._id]) ? 'bg-slate-300 dark:bg-slate-700 text-white dark:text-slate-400 cursor-not-allowed' : 'bg-[#075985] text-white shadow-sm'}`}
                         >
-                          <FileText size={18} /> Complete &amp; Generate PDF
+                          <FileText size={18} /> {t('Complete & Generate PDF')}
                         </button>
                       </div>
                     </div>

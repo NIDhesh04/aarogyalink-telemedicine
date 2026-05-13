@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import { useTranslation } from 'react-i18next'
 import { UserCircle, Stethoscope, Activity, ShieldCheck, ArrowRight, ArrowLeft, AlertCircle, Cross } from 'lucide-react'
 
 const ROLES = [
@@ -40,6 +41,7 @@ export default function Login() {
   const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const { t, i18n } = useTranslation()
 
   useEffect(() => {
     if (user) {
@@ -85,13 +87,13 @@ export default function Login() {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
               <Cross size={20} className="text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-xl font-semibold tracking-tight">AarogyaLink</span>
+            <span className="text-xl font-semibold tracking-tight">{t('AarogyaLink')}</span>
           </div>
           <h2 className="text-4xl font-bold leading-snug mb-4">
-            Rural Telemedicine<br />at Scale
+            {t('Rural Telemedicine')}<br />{t('at Scale')}
           </h2>
           <p className="text-sky-200 text-sm leading-relaxed">
-            Connecting patients in remote villages with certified district hospital doctors through AI-assisted consultations and real-time queue management.
+            {t('Connecting patients in remote villages with certified district hospital doctors through AI-assisted consultations and real-time queue management.')}
           </p>
         </div>
 
@@ -104,8 +106,8 @@ export default function Login() {
             <div key={f.label} className="flex items-start gap-3">
               <div className="w-1.5 h-1.5 rounded-full bg-sky-400 mt-1.5 shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-white">{f.label}</p>
-                <p className="text-xs text-sky-300">{f.desc}</p>
+                <p className="text-sm font-semibold text-white">{t(f.label)}</p>
+                <p className="text-xs text-sky-300">{t(f.desc)}</p>
               </div>
             </div>
           ))}
@@ -120,18 +122,26 @@ export default function Login() {
           className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden transition-colors"
         >
           {/* Card header */}
-          <div className="px-8 pt-8 pb-6 border-b border-slate-100 dark:border-slate-800">
+          <div className="px-8 pt-8 pb-6 border-b border-slate-100 dark:border-slate-800 relative">
+            <button
+              onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'hi' : 'en')}
+              className="absolute top-6 right-6 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              <span className={i18n.language === 'en' ? 'text-[#0284c7] font-bold' : ''}>A</span>
+              <span className="text-slate-300 dark:text-slate-600">/</span>
+              <span className={i18n.language === 'hi' ? 'text-[#0284c7] font-bold' : ''}>अ</span>
+            </button>
             <div className="flex items-center gap-3 mb-1 lg:hidden">
               <div className="w-8 h-8 bg-[#075985] rounded-lg flex items-center justify-center">
                 <Cross size={14} className="text-white" strokeWidth={2.5} />
               </div>
-              <span className="font-bold text-slate-800 dark:text-slate-200">AarogyaLink</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">{t('AarogyaLink')}</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {mode === 'select' ? 'Select your role' : (isRegister ? 'Create account' : 'Sign in')}
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
+              {mode === 'select' ? t('Select your role') : (isRegister ? t('Create account') : t('Sign In'))}
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {mode === 'select' ? 'Choose your role to continue' : `Continuing as ${selectedRole?.title}`}
+              {mode === 'select' ? t('Choose your role to continue') : `${t('Continuing as')} ${t(selectedRole?.title)}`}
             </p>
           </div>
 
@@ -151,8 +161,8 @@ export default function Login() {
                           <div className={`w-8 h-8 ${role.accent} rounded-lg flex items-center justify-center mb-3`}>
                             <Icon size={16} className="text-white" />
                           </div>
-                          <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-1">{role.title}</h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{role.desc}</p>
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-1">{t(role.title)}</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t(role.desc)}</p>
                         </button>
                       )
                     })}
@@ -166,16 +176,16 @@ export default function Login() {
                       onClick={() => { setMode('select'); setError(''); setForm({ name: '', email: '', password: '', specialty: '' }) }}
                       className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-medium"
                     >
-                      <ArrowLeft size={15} /> Back
+                      <ArrowLeft size={15} /> {t('Back')}
                     </button>
                     <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${selectedRole.badge}`}>
-                      <selectedRole.icon size={12} /> {selectedRole.title}
+                      <selectedRole.icon size={12} /> {t(selectedRole.title)}
                     </span>
                   </div>
 
                   {/* Sign In / Register tabs */}
                   <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 mb-6">
-                    {[['Sign In', false], ['Register', true]].map(([label, val]) => (
+                    {[[t('Sign In'), false], [t('Register'), true]].map(([label, val]) => (
                       <button
                         key={label}
                         onClick={() => { setIsRegister(val); setError('') }}
@@ -190,19 +200,19 @@ export default function Login() {
                     <AnimatePresence>
                       {isRegister && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Full Name</label>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Full Name')}</label>
                           <input
                             type="text" required value={form.name}
                             onChange={e => setForm({ ...form, name: e.target.value })}
                             className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
-                            placeholder="Full name"
+                            placeholder={t('Full Name')}
                           />
                         </motion.div>
                       )}
                     </AnimatePresence>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Email Address</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Email Address')}</label>
                       <input
                         type="email" required value={form.email}
                         onChange={e => setForm({ ...form, email: e.target.value })}
@@ -212,7 +222,7 @@ export default function Login() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Password</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Password')}</label>
                       <input
                         type="password" required value={form.password}
                         onChange={e => setForm({ ...form, password: e.target.value })}
@@ -224,7 +234,7 @@ export default function Login() {
                     <AnimatePresence>
                       {isRegister && selectedRole?.key === 'doctor' && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Medical Specialty</label>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Medical Specialty')}</label>
                           <input
                             type="text" required value={form.specialty}
                             onChange={e => setForm({ ...form, specialty: e.target.value })}
@@ -246,9 +256,9 @@ export default function Login() {
                       className={`w-full py-3 mt-2 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${loading ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed' : 'bg-[#075985] hover:bg-[#0369a1] shadow-sm hover:shadow-md'}`}
                     >
                       {loading ? (
-                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>
+                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t('Processing...')}</>
                       ) : (
-                        <>{isRegister ? 'Create Account' : 'Sign In'} <ArrowRight size={16} /></>
+                        <>{isRegister ? t('Create Account') : t('Sign In')} <ArrowRight size={16} /></>
                       )}
                     </button>
                   </form>

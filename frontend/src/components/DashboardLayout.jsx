@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../context/ThemeContext'
-import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings, Sun, Moon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings, Sun, Moon, Languages } from 'lucide-react'
 
 const ROLE_CONFIG = {
   patient:  { icon: UserCircle,  label: 'Patient',        color: 'text-sky-700 bg-sky-50 border-sky-200' },
@@ -16,7 +17,13 @@ export default function DashboardLayout({ children, title, subtitle }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
+  const { t, i18n } = useTranslation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'en' ? 'hi' : 'en'
+    i18n.changeLanguage(nextLang)
+  }
 
   if (!user) return null
 
@@ -63,13 +70,13 @@ export default function DashboardLayout({ children, title, subtitle }) {
             onClick={() => { navigate(`/${user.role}`); setSidebarOpen(false) }}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white transition-colors mb-1 ${useLocation().pathname === `/${user.role}` ? 'bg-white/15' : 'hover:bg-white/10'}`}
           >
-            <LayoutDashboard size={16} /> Dashboard
+            <LayoutDashboard size={16} /> {t('Dashboard')}
           </button>
           <button
             onClick={() => { navigate('/profile'); setSidebarOpen(false) }}
             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${useLocation().pathname === '/profile' ? 'bg-white/15' : 'hover:bg-white/10'}`}
           >
-            <Settings size={16} /> Profile Settings
+            <Settings size={16} /> {t('Settings')}
           </button>
         </nav>
 
@@ -79,14 +86,14 @@ export default function DashboardLayout({ children, title, subtitle }) {
             <RoleIcon size={18} className="shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{user.name}</p>
-              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{cfg.label}</p>
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t(cfg.label)}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <LogOut size={15} /> Sign Out
+            <LogOut size={15} /> {t('Logout')}
           </button>
         </div>
       </aside>
@@ -105,7 +112,15 @@ export default function DashboardLayout({ children, title, subtitle }) {
             <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{title}</h1>
             {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{subtitle}</p>}
           </div>
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={toggleLanguage}
+              className="px-2 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Toggle language"
+            >
+              <Languages size={16} />
+              <span className="uppercase">{i18n.language === 'hi' ? 'HI' : 'EN'}</span>
+            </button>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
@@ -115,7 +130,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
             </button>
             <div className="hidden sm:flex items-center">
               <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${cfg.color} dark:bg-slate-800 dark:border-slate-700`}>
-                <RoleIcon size={12} /> {cfg.label}
+                <RoleIcon size={12} /> {t(cfg.label)}
               </span>
             </div>
           </div>

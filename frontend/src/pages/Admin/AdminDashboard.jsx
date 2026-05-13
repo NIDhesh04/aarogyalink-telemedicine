@@ -5,6 +5,9 @@ import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import { Users, CalendarCheck, CheckSquare, TrendingUp, Stethoscope, ClipboardList, Shield, Activity, Search } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { hi } from 'date-fns/locale/hi'
+import { enUS } from 'date-fns/locale/en-US'
+import { useTranslation } from 'react-i18next'
 
 const EMPTY_ANALYTICS = [
   { day: 'Mon', bookings: 0 }, { day: 'Tue', bookings: 0 },
@@ -13,7 +16,7 @@ const EMPTY_ANALYTICS = [
   { day: 'Sun', bookings: 0 },
 ]
 
-function BarChart({ data }) {
+function BarChart({ data, t }) {
   const max = Math.max(...data.map(d => d.bookings), 1)
   return (
     <div className="flex items-end gap-2 h-24 px-1">
@@ -24,7 +27,7 @@ function BarChart({ data }) {
             className="w-full rounded-t-sm bg-[#0284c7] transition-all duration-500"
             style={{ height: `${Math.max((d.bookings / max) * 64, 2)}px`, opacity: d.bookings === 0 ? 0.2 : 1 }}
           />
-          <span className="text-[10px] text-slate-400 font-medium">{d.day}</span>
+          <span className="text-[10px] text-slate-400 font-medium">{t(d.day)}</span>
         </div>
       ))}
     </div>
@@ -39,6 +42,7 @@ export default function AdminDashboard() {
   const [totalWeekly, setTotalWeekly] = useState(0)
   const [auditLogs, setAuditLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const { t, i18n } = useTranslation()
   
   // Search states for filtering
   const [doctorSearch, setDoctorSearch] = useState('')
@@ -87,14 +91,14 @@ export default function AdminDashboard() {
   }, [auditLogs, auditSearch])
 
   const statCards = [
-    { icon: Users, label: 'Total Doctors', value: stats.totalDoctors, color: 'text-violet-700 bg-violet-50 border-violet-100' },
-    { icon: CalendarCheck, label: 'All-Time Bookings', value: stats.totalBookings, color: 'text-sky-700 bg-sky-50 border-sky-100' },
-    { icon: CheckSquare, label: 'Completed Today', value: stats.completedToday, color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-    { icon: TrendingUp, label: 'Active Patients', value: Math.floor(stats.totalBookings * 0.8), color: 'text-amber-700 bg-amber-50 border-amber-100' },
+    { icon: Users, label: t('Total Doctors'), value: stats.totalDoctors, color: 'text-violet-700 bg-violet-50 border-violet-100' },
+    { icon: CalendarCheck, label: t('All-Time Bookings'), value: stats.totalBookings, color: 'text-sky-700 bg-sky-50 border-sky-100' },
+    { icon: CheckSquare, label: t('Completed Today'), value: stats.completedToday, color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+    { icon: TrendingUp, label: t('Active Patients'), value: Math.floor(stats.totalBookings * 0.8), color: 'text-amber-700 bg-amber-50 border-amber-100' },
   ]
 
   return (
-    <DashboardLayout title="Administration" subtitle="District Hospital — Operational Overview">
+    <DashboardLayout title={t('Administration')} subtitle={t('Manage staff, view analytics, generate operational reports')}>
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         {statCards.map((s, i) => (
@@ -119,14 +123,14 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Registered Doctors</h2>
-              <span className="text-xs text-slate-400 font-medium">{filteredDoctors.length} found</span>
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('Registered Doctors')}</h2>
+              <span className="text-xs text-slate-400 font-medium">{filteredDoctors.length} {t('found')}</span>
             </div>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Search by name or specialty..." 
+                placeholder={t('Search by name or specialty...')} 
                 value={doctorSearch}
                 onChange={(e) => setDoctorSearch(e.target.value)}
                 className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
@@ -140,7 +144,7 @@ export default function AdminDashboard() {
           ) : filteredDoctors.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-slate-400">
               <Search size={28} className="mb-2 opacity-40" />
-              <p className="text-sm">No doctors match your search.</p>
+              <p className="text-sm">{t('No doctors match your search.')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -148,7 +152,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                     {['Name', 'Specialty', 'Status'].map(h => (
-                      <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{h}</th>
+                      <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t(h)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -167,11 +171,11 @@ export default function AdminDashboard() {
                           <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Dr. {d.userId?.name?.replace('Dr. ', '') || d.name || 'Unknown'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{d.specialty ?? '—'}</td>
+                      <td className="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{t(d.specialty ?? '—')}</td>
                       <td className="px-6 py-3.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Active
+                          {t('Active')}
                         </span>
                       </td>
                     </motion.tr>
@@ -185,15 +189,15 @@ export default function AdminDashboard() {
         {/* Weekly Chart */}
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 transition-colors">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Weekly Bookings</h2>
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('Weekly Bookings')}</h2>
             <span className="text-xl font-bold text-[#0284c7]">{totalWeekly}</span>
           </div>
-          <BarChart data={analytics} />
+          <BarChart data={analytics} t={t} />
           <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5">
             {[
-              { label: 'Peak Day', value: `${peakDay.day} (${peakDay.bookings})`, color: 'text-sky-700' },
-              { label: 'Most Active', value: doctors.length > 0 ? `Dr. ${doctors[0].userId?.name?.replace('Dr. ', '') || doctors[0].name || 'Unknown'}` : '—', color: 'text-violet-700' },
-              { label: 'Daily Average', value: `${Math.round(totalWeekly / 7)} bookings`, color: 'text-amber-700' },
+              { label: t('Peak Day'), value: `${t(peakDay.day)} (${peakDay.bookings})`, color: 'text-sky-700' },
+              { label: t('Most Active'), value: doctors.length > 0 ? `Dr. ${doctors[0].userId?.name?.replace('Dr. ', '') || doctors[0].name || 'Unknown'}` : '—', color: 'text-violet-700' },
+              { label: t('Daily Average'), value: `${Math.round(totalWeekly / 7)} ${t('bookings')}`, color: 'text-amber-700' },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-medium">{item.label}</span>
@@ -209,15 +213,15 @@ export default function AdminDashboard() {
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <ClipboardList size={16} className="text-slate-400" /> Platform Audit Log
+              <ClipboardList size={16} className="text-slate-400" /> {t('Platform Audit Log')}
             </h2>
-            <span className="text-xs text-slate-400 font-medium">{filteredLogs.length} entries shown</span>
+            <span className="text-xs text-slate-400 font-medium">{filteredLogs.length} {t('entries shown')}</span>
           </div>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Search logs..." 
+              placeholder={t('Search logs...')} 
               value={auditSearch}
               onChange={(e) => setAuditSearch(e.target.value)}
               className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
@@ -229,32 +233,32 @@ export default function AdminDashboard() {
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                 {['Event', 'User', 'Details', 'Time'].map(h => (
-                  <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{h}</th>
+                  <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t(h)}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">No activity logs match your search.</td>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">{t('No activity logs match your search.')}</td>
                 </tr>
               ) : (
                 filteredLogs.map((log, i) => (
                   <tr key={log._id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-xs">
                     <td className="px-6 py-3.5">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">{log.action}</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-300">{t(log.action)}</span>
                     </td>
                     <td className="px-6 py-3.5">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-900 dark:text-slate-200">{log.performedBy?.name || 'System'}</span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{log.performedBy?.role || 'Service'}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{t(log.performedBy?.role || 'Service')}</span>
                       </div>
                     </td>
                     <td className="px-6 py-3.5 text-slate-500 dark:text-slate-400 max-w-xs truncate">
                       {log.details}
                     </td>
                     <td className="px-6 py-3.5 text-slate-400 font-medium">
-                      {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: i18n.language === 'hi' ? hi : enUS })}
                     </td>
                   </tr>
                 ))
