@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
-import { Users, CalendarCheck, CheckSquare, TrendingUp, Stethoscope, ClipboardList, Shield, Activity } from 'lucide-react'
+import { Users, CalendarCheck, CheckSquare, TrendingUp, Stethoscope, ClipboardList, Shield, Activity, Search } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 const EMPTY_ANALYTICS = [
@@ -39,6 +39,10 @@ export default function AdminDashboard() {
   const [totalWeekly, setTotalWeekly] = useState(0)
   const [auditLogs, setAuditLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Search states for filtering
+  const [doctorSearch, setDoctorSearch] = useState('')
+  const [auditSearch, setAuditSearch] = useState('')
 
   // useCallback: stable fetch function — won't re-create on every render
   // Teacher checklist: "useCallback: event handlers and fetch handlers"
@@ -60,10 +64,27 @@ export default function AdminDashboard() {
   }, [fetchAll])
 
   // useMemo: peakDay derived value — only recomputes when analytics data changes
-  // Teacher checklist: "useMemo: slot grid and chart data memoized"
   const peakDay = useMemo(() => {
     return analytics.reduce((prev, cur) => (prev.bookings > cur.bookings ? prev : cur), { day: '—', bookings: 0 })
   }, [analytics])
+
+  // useMemo: Filtered lists for Advanced Search
+  const filteredDoctors = useMemo(() => {
+    return doctors.filter(d => {
+      const nameMatch = d?.userId?.name?.toLowerCase()?.includes(doctorSearch.toLowerCase()) || false;
+      const specMatch = d?.specialty?.toLowerCase()?.includes(doctorSearch.toLowerCase()) || false;
+      return nameMatch || specMatch;
+    })
+  }, [doctors, doctorSearch])
+
+  const filteredLogs = useMemo(() => {
+    return auditLogs.filter(log => {
+      const actionMatch = log?.action?.toLowerCase()?.includes(auditSearch.toLowerCase()) || false;
+      const nameMatch = log?.performedBy?.name?.toLowerCase()?.includes(auditSearch.toLowerCase()) || false;
+      const detailsMatch = log?.details?.toLowerCase()?.includes(auditSearch.toLowerCase()) || false;
+      return actionMatch || nameMatch || detailsMatch;
+    })
+  }, [auditLogs, auditSearch])
 
   const statCards = [
     { icon: Users, label: 'Total Doctors', value: stats.totalDoctors, color: 'text-violet-700 bg-violet-50 border-violet-100' },
@@ -96,18 +117,30 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Doctor Roster */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Registered Doctors</h2>
-            <span className="text-xs text-slate-400 font-medium">{doctors.length} total</span>
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Registered Doctors</h2>
+              <span className="text-xs text-slate-400 font-medium">{filteredDoctors.length} found</span>
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search by name or specialty..." 
+                value={doctorSearch}
+                onChange={(e) => setDoctorSearch(e.target.value)}
+                className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
+              />
+            </div>
           </div>
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-slate-200 border-t-[#0284c7] rounded-full animate-spin" />
             </div>
-          ) : doctors.length === 0 ? (
+          ) : filteredDoctors.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-              <Stethoscope size={28} className="mb-2 opacity-40" />
-              <p className="text-sm">No doctors registered yet.</p>
+              <Search size={28} className="mb-2 opacity-40" />
+              <p className="text-sm">No doctors match your search.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -120,7 +153,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {doctors.map((d, i) => (
+                  {filteredDoctors.map((d, i) => (
                     <motion.tr
                       key={d._id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
@@ -131,7 +164,7 @@ export default function AdminDashboard() {
                           <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
                             <Stethoscope size={14} className="text-violet-600" />
                           </div>
-                          <span className="text-sm font-semibold text-slate-800">Dr. {d.name}</span>
+                          <span className="text-sm font-semibold text-slate-800">Dr. {d.userId?.name?.replace('Dr. ', '') || d.name || 'Unknown'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-3.5 text-sm text-slate-500">{d.specialty ?? '—'}</td>
@@ -159,7 +192,7 @@ export default function AdminDashboard() {
           <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5">
             {[
               { label: 'Peak Day', value: `${peakDay.day} (${peakDay.bookings})`, color: 'text-sky-700' },
-              { label: 'Most Active', value: doctors.length > 0 ? `Dr. ${doctors[0].name}` : '—', color: 'text-violet-700' },
+              { label: 'Most Active', value: doctors.length > 0 ? `Dr. ${doctors[0].userId?.name?.replace('Dr. ', '') || doctors[0].name || 'Unknown'}` : '—', color: 'text-violet-700' },
               { label: 'Daily Average', value: `${Math.round(totalWeekly / 7)} bookings`, color: 'text-amber-700' },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between">
@@ -173,11 +206,23 @@ export default function AdminDashboard() {
 
       {/* Audit Log Section */}
       <div className="mt-8 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-            <ClipboardList size={16} className="text-slate-400" /> Platform Audit Log
-          </h2>
-          <span className="text-xs text-slate-400 font-medium">Last 50 entries</span>
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <ClipboardList size={16} className="text-slate-400" /> Platform Audit Log
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">{filteredLogs.length} entries shown</span>
+          </div>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search logs..." 
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+              className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -189,12 +234,12 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {auditLogs.length === 0 ? (
+              {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">No activity logs found.</td>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">No activity logs match your search.</td>
                 </tr>
               ) : (
-                auditLogs.map((log, i) => (
+                filteredLogs.map((log, i) => (
                   <tr key={log._id || i} className="hover:bg-slate-50 transition-colors text-xs">
                     <td className="px-6 py-3.5">
                       <span className="font-bold text-slate-700">{log.action}</span>
