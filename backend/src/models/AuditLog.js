@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const auditLogSchema = new mongoose.Schema({
   action: {
     type: String,
-    enum: ['booking_created', 'booking_cancelled', 'booking_completed', 'slot_created', 'user_registered'],
+    enum: ['booking_created', 'booking_cancelled', 'booking_completed', 'slot_created', 'user_registered', 'review_submitted'],
     required: true,
   },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

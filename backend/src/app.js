@@ -18,6 +18,7 @@ const userRoutes = require('./routes/user.routes');
 const sseRoutes = require('./routes/sse.routes');
 const adminRoutes = require('./routes/admin.routes');
 const prescriptionRoutes = require('./routes/prescription.routes');
+const reviewRoutes = require('./routes/review.routes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 // Middleware
@@ -41,6 +42,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/sse', sseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.get('/', (req, res) => {
     res.send('aarogyalink backend is running');
