@@ -8,25 +8,25 @@ const ROLES = [
   {
     key: 'patient', icon: UserCircle, title: 'Patient',
     desc: 'Book consultations, track queue position, download prescriptions',
-    border: 'border-sky-200', accent: 'bg-sky-600', badge: 'bg-sky-50 text-sky-700 border-sky-200',
+    border: 'border-sky-200 dark:border-sky-900', accent: 'bg-sky-600 dark:bg-sky-500', badge: 'bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-900/50',
     route: '/patient'
   },
   {
     key: 'doctor', icon: Stethoscope, title: 'Doctor',
     desc: 'Manage schedule, review clinical briefs, issue prescriptions',
-    border: 'border-violet-200', accent: 'bg-violet-700', badge: 'bg-violet-50 text-violet-700 border-violet-200',
+    border: 'border-violet-200 dark:border-violet-900', accent: 'bg-violet-700 dark:bg-violet-600', badge: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-900/50',
     route: '/doctor'
   },
   {
     key: 'asha', icon: Activity, title: 'ASHA Worker',
     desc: 'Book on behalf of patients, manage local community caseload',
-    border: 'border-amber-200', accent: 'bg-amber-600', badge: 'bg-amber-50 text-amber-700 border-amber-200',
+    border: 'border-amber-200 dark:border-amber-900', accent: 'bg-amber-600 dark:bg-amber-500', badge: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/50',
     route: '/asha'
   },
   {
     key: 'admin', icon: ShieldCheck, title: 'Administrator',
     desc: 'Manage staff, view analytics, generate operational reports',
-    border: 'border-red-200', accent: 'bg-red-700', badge: 'bg-red-50 text-red-700 border-red-200',
+    border: 'border-red-200 dark:border-red-900', accent: 'bg-red-700 dark:bg-red-600', badge: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/50',
     route: '/admin'
   },
 ]
@@ -72,7 +72,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full flex font-sans" style={{ background: '#f0f4f8' }}>
+    <div className="min-h-screen w-full flex font-sans bg-[#f0f4f8] dark:bg-[#0f172a] transition-colors">
       {/* Left panel — branding */}
       <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-[#075985] p-12 text-white relative overflow-hidden">
         {/* Subtle pattern overlay */}
@@ -117,20 +117,20 @@ export default function Login() {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden"
+          className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden transition-colors"
         >
           {/* Card header */}
-          <div className="px-8 pt-8 pb-6 border-b border-slate-100">
+          <div className="px-8 pt-8 pb-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3 mb-1 lg:hidden">
               <div className="w-8 h-8 bg-[#075985] rounded-lg flex items-center justify-center">
                 <Cross size={14} className="text-white" strokeWidth={2.5} />
               </div>
-              <span className="font-bold text-slate-800">AarogyaLink</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">AarogyaLink</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
               {mode === 'select' ? 'Select your role' : (isRegister ? 'Create account' : 'Sign in')}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {mode === 'select' ? 'Choose your role to continue' : `Continuing as ${selectedRole?.title}`}
             </p>
           </div>
@@ -146,13 +146,13 @@ export default function Login() {
                         <button
                           key={role.key}
                           onClick={() => handleRoleSelect(role)}
-                          className={`group flex flex-col items-start p-4 bg-white border-2 ${role.border} rounded-xl hover:bg-slate-50 transition-all text-left`}
+                          className={`group flex flex-col items-start p-4 bg-white dark:bg-slate-800/50 border-2 ${role.border} rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left`}
                         >
                           <div className={`w-8 h-8 ${role.accent} rounded-lg flex items-center justify-center mb-3`}>
                             <Icon size={16} className="text-white" />
                           </div>
-                          <h3 className="font-semibold text-slate-800 text-sm mb-1">{role.title}</h3>
-                          <p className="text-xs text-slate-500 leading-relaxed">{role.desc}</p>
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-1">{role.title}</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{role.desc}</p>
                         </button>
                       )
                     })}
@@ -164,7 +164,7 @@ export default function Login() {
                   <div className="flex items-center justify-between mb-5">
                     <button
                       onClick={() => { setMode('select'); setError(''); setForm({ name: '', email: '', password: '', specialty: '' }) }}
-                      className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 transition-colors font-medium"
+                      className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-medium"
                     >
                       <ArrowLeft size={15} /> Back
                     </button>
@@ -174,12 +174,12 @@ export default function Login() {
                   </div>
 
                   {/* Sign In / Register tabs */}
-                  <div className="flex border border-slate-200 rounded-lg p-0.5 mb-6">
+                  <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 mb-6">
                     {[['Sign In', false], ['Register', true]].map(([label, val]) => (
                       <button
                         key={label}
                         onClick={() => { setIsRegister(val); setError('') }}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${isRegister === val ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${isRegister === val ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                       >
                         {label}
                       </button>
@@ -190,11 +190,11 @@ export default function Login() {
                     <AnimatePresence>
                       {isRegister && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Full Name</label>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Full Name</label>
                           <input
                             type="text" required value={form.name}
                             onChange={e => setForm({ ...form, name: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
                             placeholder="Full name"
                           />
                         </motion.div>
@@ -202,21 +202,21 @@ export default function Login() {
                     </AnimatePresence>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Email Address</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Email Address</label>
                       <input
                         type="email" required value={form.email}
                         onChange={e => setForm({ ...form, email: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
                         placeholder="you@hospital.in"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Password</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Password</label>
                       <input
                         type="password" required value={form.password}
                         onChange={e => setForm({ ...form, password: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
                         placeholder="••••••••"
                       />
                     </div>
@@ -224,11 +224,11 @@ export default function Login() {
                     <AnimatePresence>
                       {isRegister && selectedRole?.key === 'doctor' && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Medical Specialty</label>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">Medical Specialty</label>
                           <input
                             type="text" required value={form.specialty}
                             onChange={e => setForm({ ...form, specialty: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
                             placeholder="e.g. General Medicine"
                           />
                         </motion.div>
@@ -236,14 +236,14 @@ export default function Login() {
                     </AnimatePresence>
 
                     {error && (
-                      <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+                      <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-900/50">
                         <AlertCircle size={15} className="shrink-0" /> <span>{error}</span>
                       </div>
                     )}
 
                     <button
                       type="submit" disabled={loading}
-                      className={`w-full py-3 mt-2 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#075985] hover:bg-[#0369a1] shadow-sm hover:shadow-md'}`}
+                      className={`w-full py-3 mt-2 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all ${loading ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed' : 'bg-[#075985] hover:bg-[#0369a1] shadow-sm hover:shadow-md'}`}
                     >
                       {loading ? (
                         <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing...</>

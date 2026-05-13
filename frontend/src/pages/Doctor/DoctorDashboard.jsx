@@ -9,10 +9,10 @@ import {
 } from 'lucide-react'
 
 const STATUS_MAP = {
-  pending:   { bg: 'bg-amber-100',   color: 'text-amber-600',   label: 'Open' },
-  completed: { bg: 'bg-emerald-100', color: 'text-emerald-600', label: 'Done' },
-  cancelled: { bg: 'bg-red-100',     color: 'text-red-600',     label: 'Cancelled' },
-  booked:    { bg: 'bg-teal-100',    color: 'text-teal-600',    label: 'Booked' },
+  pending:   { bg: 'bg-amber-100 dark:bg-amber-900/20',   color: 'text-amber-600 dark:text-amber-400',   label: 'Open' },
+  completed: { bg: 'bg-emerald-100 dark:bg-emerald-900/20', color: 'text-emerald-600 dark:text-emerald-400', label: 'Done' },
+  cancelled: { bg: 'bg-red-100 dark:bg-red-900/20',     color: 'text-red-600 dark:text-red-400',     label: 'Cancelled' },
+  booked:    { bg: 'bg-teal-100 dark:bg-teal-900/20',    color: 'text-teal-600 dark:text-teal-400',    label: 'Booked' },
 }
 
 const TIME_OPTIONS = [
@@ -152,14 +152,14 @@ export default function DoctorDashboard() {
   const StatCard = useCallback(({ icon: Icon, value, label, colorClass, delay }) => (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
-      className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow"
+      className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 hover:shadow-md transition-all"
     >
       <div className={`p-4 rounded-xl ${colorClass}`}>
         <Icon size={28} />
       </div>
       <div>
-        <div className="text-3xl font-bold text-slate-800">{value}</div>
-        <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mt-1">{label}</div>
+        <div className="text-3xl font-bold text-slate-800 dark:text-white">{value}</div>
+        <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-1">{label}</div>
       </div>
     </motion.div>
   ), [])
@@ -168,12 +168,12 @@ export default function DoctorDashboard() {
     <DashboardLayout
       title={
         <div className="flex items-center gap-4">
-          <span>Welcome, {user?.name ?? 'Doctor'} 👋</span>
+          <span className="dark:text-white">Welcome, {user?.name ?? 'Doctor'} 👋</span>
           {ratingData.count > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-sm">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 rounded-full text-sm">
               <Star size={16} className="text-amber-500 fill-amber-500" />
-              <span className="font-bold text-amber-700">{ratingData.average}</span>
-              <span className="text-amber-600/70 text-xs font-medium">({ratingData.count} reviews)</span>
+              <span className="font-bold text-amber-700 dark:text-amber-400">{ratingData.average}</span>
+              <span className="text-amber-600/70 dark:text-amber-400/70 text-xs font-medium">({ratingData.count} reviews)</span>
             </div>
           )}
         </div>
@@ -182,17 +182,17 @@ export default function DoctorDashboard() {
     >
       {/* Stats Grid — values come from useMemo(stats) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard icon={Calendar}     value={stats.total}   label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-primary/10 text-[#0284c7]" delay={0.1} />
-        <StatCard icon={Clock}        value={stats.pending} label="Open Slots"     colorClass="bg-amber-100 text-amber-600"     delay={0.2} />
-        <StatCard icon={CheckCircle2} value={stats.done}    label="Booked / Done"  colorClass="bg-emerald-100 text-emerald-600" delay={0.3} />
+        <StatCard icon={Calendar}     value={stats.total}   label={`Slots on ${viewDate === today ? 'Today' : viewDate}`} colorClass="bg-sky-100 dark:bg-sky-900/20 text-[#0284c7] dark:text-[#38bdf8]" delay={0.1} />
+        <StatCard icon={Clock}        value={stats.pending} label="Open Slots"     colorClass="bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"     delay={0.2} />
+        <StatCard icon={CheckCircle2} value={stats.done}    label="Booked / Done"  colorClass="bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" delay={0.3} />
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-200/50 p-1.5 rounded-xl mb-8 w-fit">
+      <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1.5 rounded-xl mb-8 w-fit transition-colors">
         {[['schedule', 'My Schedule'], ['add', 'Add Slots']].map(([key, label]) => (
           <button
             key={key}
-            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${tab === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${tab === key ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             onClick={() => setTab(key)}
           >
             {key === 'add'      && <PlusCircle size={16} />}
@@ -207,27 +207,27 @@ export default function DoctorDashboard() {
         {tab === 'add' && (
           <motion.div
             key="add" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-            className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 max-w-lg"
+            className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 max-w-lg transition-colors"
           >
-            <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-              <PlusCircle className="text-[#0284c7]" size={24} /> Add Availability Slot
+            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+              <PlusCircle className="text-[#0284c7] dark:text-[#38bdf8]" size={24} /> Add Availability Slot
             </h3>
-            <p className="text-sm font-medium text-slate-500 mb-8">Patients will be able to book these slots once you add them.</p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">Patients will be able to book these slots once you add them.</p>
 
             <form onSubmit={handleAddSlot} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Date</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Date</label>
                 <input
                   type="date" required min={today}
                   value={newSlot.date} onChange={e => setNewSlot({ ...newSlot, date: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700 dark:text-slate-200"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Time Slot</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Time Slot</label>
                 <select
                   required value={newSlot.time} onChange={e => setNewSlot({ ...newSlot, time: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700 dark:text-slate-200"
                 >
                   <option value="">Select a time...</option>
                   {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -262,13 +262,13 @@ export default function DoctorDashboard() {
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
           >
             {/* Left Panel: Slot List — uses sortedSlots from useMemo */}
-            <div className="lg:col-span-5 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col max-h-[600px]">
-              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 className="font-bold text-slate-800">Schedule</h3>
+            <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[600px] transition-colors">
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">Schedule</h3>
                 <input
                   type="date" value={viewDate}
                   onChange={e => { setViewDate(e.target.value); setSelected(null) }}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50"
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-colors"
                 />
               </div>
 
@@ -300,17 +300,17 @@ export default function DoctorDashboard() {
                       <button
                         key={slot._id}
                         onClick={() => { setSelected(slot); setPrescription('') }}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${isSelected ? 'border-[#0284c7] bg-sky-50 shadow-sm ring-1 ring-[#0284c7]' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${isSelected ? 'border-[#0284c7] bg-sky-50 dark:bg-[#075985]/20 shadow-sm ring-1 ring-[#0284c7]' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#0284c7] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#0284c7] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                             {slot.isBooked ? <UserIcon size={18} /> : <Clock size={18} />}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-800 text-sm mb-0.5">
+                            <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-0.5">
                               {slot.bookedBy?.name ?? (slot.isBooked ? 'Patient' : 'Open Slot')}
                             </div>
-                            <div className="text-xs font-medium text-slate-500">
+                            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
                               {slot.time ?? slot.startTime}
                             </div>
                           </div>
@@ -326,24 +326,24 @@ export default function DoctorDashboard() {
             </div>
 
             {/* Right Panel: Consultation Detail */}
-            <div className="lg:col-span-7 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full min-h-[500px]">
+            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col h-full min-h-[500px] transition-colors">
               {!selected ? (
-                <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-slate-50/30">
-                  <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-4">
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-slate-50/30 dark:bg-slate-900/30">
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-full flex items-center justify-center mb-4">
                     <Activity size={32} />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-700 mb-2">No Consultation Selected</h3>
+                  <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No Consultation Selected</h3>
                   <p className="text-sm font-medium text-slate-500 max-w-sm">Select a slot from your schedule on the left to view patient details and write prescriptions.</p>
                 </div>
               ) : (
                 <div className="p-8 flex flex-col h-full">
                   {/* Header */}
-                  <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100">
+                  <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100 dark:border-slate-800">
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-800 mb-1">
+                      <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-1">
                         {selected.bookedBy?.name ?? 'Open Slot'}
                       </h2>
-                      <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                         <Clock size={14} /> {selected.time ?? selected.startTime}
                       </p>
                     </div>
@@ -360,13 +360,13 @@ export default function DoctorDashboard() {
 
                   {/* AI Symptom Brief */}
                   {selected.symptomBrief && (
-                    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                    <div className="bg-sky-50/50 dark:bg-[#075985]/10 border border-sky-200/50 dark:border-[#075985]/30 rounded-2xl p-5 mb-8 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-[#0284c7] dark:bg-[#38bdf8]" />
                       <div className="flex items-center gap-2 mb-3">
-                        <Sparkles size={18} className="text-[#0284c7]" />
-                        <span className="text-sm font-bold text-[#0284c7] tracking-wide uppercase">AI Symptom Brief</span>
+                        <Sparkles size={18} className="text-[#0284c7] dark:text-[#38bdf8]" />
+                        <span className="text-sm font-bold text-[#0284c7] dark:text-[#38bdf8] tracking-wide uppercase">AI Symptom Brief</span>
                       </div>
-                      <p className="text-slate-700 text-sm leading-relaxed font-medium">
+                      <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed font-medium">
                         {selected.symptomBrief}
                       </p>
                     </div>
@@ -376,14 +376,14 @@ export default function DoctorDashboard() {
                   {selected.isBooked && (
                     <div className="flex flex-col flex-1">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide flex items-center gap-2">
                           <FileText size={16} className="text-slate-400" /> Write Prescription
                         </h3>
                         {selected.symptomBrief && !saved[selected._id] && (
                           <button
                             onClick={handleAIAssist}
                             disabled={aiLoading}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-[#0284c7] hover:bg-primary/20 font-bold text-xs rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-100/50 dark:bg-[#075985]/20 text-[#0284c7] dark:text-[#38bdf8] hover:bg-sky-100 dark:hover:bg-[#075985]/40 font-bold text-xs rounded-lg transition-colors"
                           >
                             {aiLoading ? (
                               <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> Generating...</>
@@ -395,7 +395,7 @@ export default function DoctorDashboard() {
                       </div>
 
                       {saved[selected._id] ? (
-                        <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-emerald-900 text-sm leading-relaxed whitespace-pre-wrap mb-6">
+                        <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl p-5 text-emerald-900 dark:text-emerald-400 text-sm leading-relaxed whitespace-pre-wrap mb-6">
                           {saved[selected._id]}
                         </div>
                       ) : (
@@ -403,15 +403,15 @@ export default function DoctorDashboard() {
                           value={prescription}
                           onChange={e => setPrescription(e.target.value)}
                           placeholder={`e.g. Tab Paracetamol 500mg - twice daily for 3 days\nPlenty of fluids and rest...`}
-                          className="flex-1 w-full p-5 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-slate-700 resize-none mb-6 min-h-[150px]"
+                          className="flex-1 w-full p-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700 dark:text-slate-200 resize-none mb-6 min-h-[150px]"
                         />
                       )}
 
-                      <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t border-slate-100">
+                      <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
                         {!saved[selected._id] && (
                           <button
                             onClick={() => { if (prescription.trim()) setSaved(p => ({ ...p, [selected._id]: prescription })) }}
-                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                           >
                             <CheckSquare size={18} /> Save Draft
                           </button>
@@ -420,7 +420,7 @@ export default function DoctorDashboard() {
                         <button
                           onClick={handleComplete}
                           disabled={!prescription.trim() && !saved[selected._id]}
-                          className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${(!prescription.trim() && !saved[selected._id]) ? 'bg-slate-300 text-white cursor-not-allowed' : 'bg-[#075985] text-white shadow-sm'}`}
+                          className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${(!prescription.trim() && !saved[selected._id]) ? 'bg-slate-300 dark:bg-slate-700 text-white dark:text-slate-400 cursor-not-allowed' : 'bg-[#075985] text-white shadow-sm'}`}
                         >
                           <FileText size={18} /> Complete &amp; Generate PDF
                         </button>

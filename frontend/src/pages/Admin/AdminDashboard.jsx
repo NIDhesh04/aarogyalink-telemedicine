@@ -101,14 +101,14 @@ export default function AdminDashboard() {
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-            className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4"
+            className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 flex items-center gap-4 transition-colors"
           >
-            <div className={`w-11 h-11 rounded-lg flex items-center justify-center border ${s.color} shrink-0`}>
+            <div className={`w-11 h-11 rounded-lg flex items-center justify-center border ${s.color} dark:bg-slate-800 dark:border-slate-700 shrink-0`}>
               <s.icon size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">{s.label}</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{s.value}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{s.label}</p>
             </div>
           </motion.div>
         ))}
@@ -116,10 +116,10 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Doctor Roster */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Registered Doctors</h2>
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Registered Doctors</h2>
               <span className="text-xs text-slate-400 font-medium">{filteredDoctors.length} found</span>
             </div>
             <div className="relative">
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
                 placeholder="Search by name or specialty..." 
                 value={doctorSearch}
                 onChange={(e) => setDoctorSearch(e.target.value)}
-                className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
+                className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
               />
             </div>
           </div>
@@ -146,30 +146,30 @@ export default function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                     {['Name', 'Specialty', 'Status'].map(h => (
-                      <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{h}</th>
+                      <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredDoctors.map((d, i) => (
                     <motion.tr
                       key={d._id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
-                      className="hover:bg-slate-50 transition-colors"
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                     >
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
-                            <Stethoscope size={14} className="text-violet-600" />
+                          <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                            <Stethoscope size={14} className="text-violet-600 dark:text-violet-400" />
                           </div>
-                          <span className="text-sm font-semibold text-slate-800">Dr. {d.userId?.name?.replace('Dr. ', '') || d.name || 'Unknown'}</span>
+                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Dr. {d.userId?.name?.replace('Dr. ', '') || d.name || 'Unknown'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-3.5 text-sm text-slate-500">{d.specialty ?? '—'}</td>
+                      <td className="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{d.specialty ?? '—'}</td>
                       <td className="px-6 py-3.5">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           Active
                         </span>
@@ -183,9 +183,9 @@ export default function AdminDashboard() {
         </div>
 
         {/* Weekly Chart */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 transition-colors">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-sm font-semibold text-slate-800">Weekly Bookings</h2>
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Weekly Bookings</h2>
             <span className="text-xl font-bold text-[#0284c7]">{totalWeekly}</span>
           </div>
           <BarChart data={analytics} />
@@ -205,10 +205,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Audit Log Section */}
-      <div className="mt-8 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between flex-wrap gap-4">
+      <div className="mt-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-colors">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <ClipboardList size={16} className="text-slate-400" /> Platform Audit Log
             </h2>
             <span className="text-xs text-slate-400 font-medium">{filteredLogs.length} entries shown</span>
@@ -220,37 +220,37 @@ export default function AdminDashboard() {
               placeholder="Search logs..." 
               value={auditSearch}
               onChange={(e) => setAuditSearch(e.target.value)}
-              className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
+              className="pl-8 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 w-48 sm:w-64 transition-all"
             />
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
+              <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                 {['Event', 'User', 'Details', 'Time'].map(h => (
-                  <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{h}</th>
+                  <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredLogs.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">No activity logs match your search.</td>
                 </tr>
               ) : (
                 filteredLogs.map((log, i) => (
-                  <tr key={log._id || i} className="hover:bg-slate-50 transition-colors text-xs">
+                  <tr key={log._id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-xs">
                     <td className="px-6 py-3.5">
-                      <span className="font-bold text-slate-700">{log.action}</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-300">{log.action}</span>
                     </td>
                     <td className="px-6 py-3.5">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-900">{log.performedBy?.name || 'System'}</span>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold">{log.performedBy?.role || 'Service'}</span>
+                        <span className="font-semibold text-slate-900 dark:text-slate-200">{log.performedBy?.name || 'System'}</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{log.performedBy?.role || 'Service'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 text-slate-500 max-w-xs truncate">
+                    <td className="px-6 py-3.5 text-slate-500 dark:text-slate-400 max-w-xs truncate">
                       {log.details}
                     </td>
                     <td className="px-6 py-3.5 text-slate-400 font-medium">

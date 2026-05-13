@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings, Sun, Moon } from 'lucide-react'
 
 const ROLE_CONFIG = {
   patient:  { icon: UserCircle,  label: 'Patient',        color: 'text-sky-700 bg-sky-50 border-sky-200' },
@@ -14,6 +15,7 @@ const ROLE_CONFIG = {
 export default function DashboardLayout({ children, title, subtitle }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { theme, toggleTheme } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (!user) return null
@@ -27,7 +29,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
   }
 
   return (
-    <div className="min-h-screen flex font-sans" style={{ background: '#f0f4f8' }}>
+    <div className="min-h-screen flex font-sans bg-[#f0f4f8] dark:bg-slate-950 transition-colors duration-200">
       {/* Mobile overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -41,7 +43,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static top-0 left-0 h-full w-60 bg-[#075985] z-50 flex flex-col transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`fixed lg:static top-0 left-0 h-full w-60 bg-[#075985] dark:bg-slate-900 z-50 flex flex-col transition-all duration-200 border-r border-transparent dark:border-slate-800 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         {/* Logo */}
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/10">
@@ -72,12 +74,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
         </nav>
 
         {/* User card at bottom */}
-        <div className="p-3 border-t border-white/10">
-          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-2 ${cfg.color} bg-white`}>
+        <div className="p-3 border-t border-white/10 dark:border-slate-800">
+          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-2 ${cfg.color} dark:bg-slate-800/50 dark:border-slate-700 bg-white`}>
             <RoleIcon size={18} className="shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate">{user.name}</p>
-              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{cfg.label}</p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{user.name}</p>
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{cfg.label}</p>
             </div>
           </div>
           <button
@@ -92,21 +94,30 @@ export default function DashboardLayout({ children, title, subtitle }) {
       {/* Main */}
       <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 lg:px-8 shrink-0 sticky top-0 z-30">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 lg:px-8 shrink-0 sticky top-0 z-30 transition-colors duration-200">
           <button
-            className="p-1.5 mr-4 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 lg:hidden transition-colors"
+            className="p-1.5 mr-4 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 lg:hidden transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={20} />
           </button>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">{title}</h1>
-            {subtitle && <p className="text-xs text-slate-500 font-medium mt-0.5">{subtitle}</p>}
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{title}</h1>
+            {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{subtitle}</p>}
           </div>
-          <div className="ml-auto hidden sm:flex items-center gap-2">
-            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${cfg.color}`}>
-              <RoleIcon size={12} /> {cfg.label}
-            </span>
+          <div className="ml-auto flex items-center gap-4">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <div className="hidden sm:flex items-center">
+              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${cfg.color} dark:bg-slate-800 dark:border-slate-700`}>
+                <RoleIcon size={12} /> {cfg.label}
+              </span>
+            </div>
           </div>
         </header>
 
