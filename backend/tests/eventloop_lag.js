@@ -133,7 +133,7 @@ function nonBlockingPDFInWorkerThread() {
     `;
 
     // Write the inline script to a temp file (worker_threads requires a file path)
-    const tmpFile = path.join(os.tmpdir(), 'aarogya_pdf_worker_test.js');
+    const tmpFile = path.join(__dirname, 'aarogya_pdf_worker_test.js');
     fs.writeFileSync(tmpFile, workerCode);
 
     const worker = new Worker(tmpFile, { workerData: { count: 5 } });
