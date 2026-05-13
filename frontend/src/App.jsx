@@ -5,11 +5,18 @@ import PatientDashboard from './pages/Patient/PatientDashboard'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
 import ASHADashboard from './pages/ASHA/ASHADashboard'
 import AdminDashboard from './pages/Admin/AdminDashboard'
+import ProfileSettings from './pages/Profile/ProfileSettings'
 
 function ProtectedRoute({ role, children }) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== role) return <Navigate to="/login" replace />
+  return children
+}
+
+function RequireAuth({ children }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
   return children
 }
 
@@ -23,6 +30,7 @@ function App() {
         <Route path="/doctor"  element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
         <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<RequireAuth><ProfileSettings /></RequireAuth>} />
       </Routes>
     </BrowserRouter>
   )

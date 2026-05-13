@@ -37,6 +37,7 @@ export default function Navbar() {
             <div className="navbar-user-role">{user.role}</div>
           </div>
         </div>
+        <button className="navbar-logout" onClick={() => navigate('/profile')} style={{ marginRight: '10px', background: 'transparent', border: '1px solid currentColor', color: 'inherit' }}>Settings</button>
         <button className="navbar-logout" onClick={handleLogout}>Logout</button>
       </div>
 
@@ -55,6 +56,9 @@ export default function Navbar() {
               <div className="navbar-user-role">{user.role}</div>
             </div>
           </div>
+          <button className="navbar-logout" onClick={() => { setMenuOpen(false); navigate('/profile'); }} style={{ width: '100%', textAlign: 'center', marginBottom: '10px', background: 'transparent', border: '1px solid currentColor', color: 'inherit' }}>
+            Settings
+          </button>
           <button className="navbar-logout" onClick={handleLogout} style={{ width: '100%', textAlign: 'center' }}>
             Logout
           </button>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross } from 'lucide-react'
+import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings } from 'lucide-react'
 
 const ROLE_CONFIG = {
   patient:  { icon: UserCircle,  label: 'Patient',        color: 'text-sky-700 bg-sky-50 border-sky-200' },
@@ -59,9 +59,15 @@ export default function DashboardLayout({ children, title, subtitle }) {
           <p className="text-white/40 text-[10px] font-semibold uppercase tracking-widest px-2 mb-2">Navigation</p>
           <button
             onClick={() => { navigate(`/${user.role}`); setSidebarOpen(false) }}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-white/15 hover:bg-white/20 transition-colors"
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white transition-colors mb-1 ${useLocation().pathname === `/${user.role}` ? 'bg-white/15' : 'hover:bg-white/10'}`}
           >
             <LayoutDashboard size={16} /> Dashboard
+          </button>
+          <button
+            onClick={() => { navigate('/profile'); setSidebarOpen(false) }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${useLocation().pathname === '/profile' ? 'bg-white/15' : 'hover:bg-white/10'}`}
+          >
+            <Settings size={16} /> Profile Settings
           </button>
         </nav>
 
