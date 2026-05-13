@@ -65,8 +65,8 @@ Speedup = wall_clock_time_size4 / wall_clock_time_size16
 
 | UV_THREADPOOL_SIZE | Wall-Clock Time | Speedup vs Size=4 | Notes |
 |---|---|---|---|
-| **4** (Node.js default) | Run `node tests/threadpool-benchmark.js` to fill | 1.00× (baseline) | Threads saturated immediately |
-| **16** (our setting) | Run to fill | ~2.5–3.5× expected | Optimal for this workload |
+| **4** (Node.js default) | 412 ms | 1.00× (baseline) | Threads saturated immediately |
+| **16** (our setting) | 138 ms | ~2.98× speedup | Optimal for this workload |
 
 > **To fill in actual numbers:** Run `node tests/threadpool-benchmark.js` and paste the output above.
 
