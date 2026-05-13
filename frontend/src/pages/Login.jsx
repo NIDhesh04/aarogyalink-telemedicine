@@ -65,7 +65,7 @@ export default function Login() {
         await login(form.email, form.password)
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Authentication failed. Please try again.')
+      setError(err.response?.data?.message || err.response?.data?.error || 'Authentication failed. Please try again.')
     } finally {
       setLoading(false)
     }

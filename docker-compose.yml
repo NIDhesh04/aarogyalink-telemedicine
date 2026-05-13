@@ -39,6 +39,7 @@ services:
       - PORT=5005
       - MONGO_URI=mongodb://mongo:27017/aarogyalink
       - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
       - UV_THREADPOOL_SIZE=16
     depends_on:
       mongo:
@@ -53,7 +54,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=http://localhost:5005/api
     depends_on:
       - backend
 
