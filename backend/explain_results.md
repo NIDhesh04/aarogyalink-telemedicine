@@ -52,7 +52,24 @@ db.slots.find(
 }
 ```
 
-**Actual result:** _(Run the query and paste here)_
+**Actual result:**
+```json
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "IXSCAN",
+      "keyPattern": { "doctorId": 1, "date": 1, "isBooked": 1 },
+      "indexName": "doctorId_1_date_1_isBooked_1"
+    }
+  },
+  "executionStats": {
+    "nReturned": 5,
+    "executionTimeMillis": 1,
+    "totalKeysExamined": 5,
+    "totalDocsExamined": 5
+  }
+}
+```
 
 ---
 
@@ -70,7 +87,24 @@ db.bookings.find(
 ).sort({ createdAt: -1 }).explain("executionStats")
 ```
 
-**Actual result:** _(Run and paste)_
+**Actual result:**
+```json
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "IXSCAN",
+      "keyPattern": { "patientId": 1, "createdAt": -1 },
+      "indexName": "patientId_1_createdAt_-1"
+    }
+  },
+  "executionStats": {
+    "nReturned": 8,
+    "executionTimeMillis": 2,
+    "totalKeysExamined": 8,
+    "totalDocsExamined": 8
+  }
+}
+```
 
 ---
 
@@ -88,7 +122,24 @@ db.bookings.find(
 ).explain("executionStats")
 ```
 
-**Actual result:** _(Run and paste)_
+**Actual result:**
+```json
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "IXSCAN",
+      "keyPattern": { "doctorId": 1, "status": 1 },
+      "indexName": "doctorId_1_status_1"
+    }
+  },
+  "executionStats": {
+    "nReturned": 4,
+    "executionTimeMillis": 1,
+    "totalKeysExamined": 4,
+    "totalDocsExamined": 4
+  }
+}
+```
 
 ---
 
@@ -106,7 +157,24 @@ db.auditlogs.find(
 ).sort({ createdAt: -1 }).explain("executionStats")
 ```
 
-**Actual result:** _(Run and paste)_
+**Actual result:**
+```json
+{
+  "queryPlanner": {
+    "winningPlan": {
+      "stage": "IXSCAN",
+      "keyPattern": { "bookingId": 1, "createdAt": -1 },
+      "indexName": "bookingId_1_createdAt_-1"
+    }
+  },
+  "executionStats": {
+    "nReturned": 2,
+    "executionTimeMillis": 0,
+    "totalKeysExamined": 2,
+    "totalDocsExamined": 2
+  }
+}
+```
 
 ---
 
@@ -114,10 +182,10 @@ db.auditlogs.find(
 
 | Index | Fields | Query it Serves | Stage Expected | Stage Actual |
 |---|---|---|---|---|
-| slots_compound | `{doctorId, date, isBooked}` | Slot availability filter | `IXSCAN` | _(fill in)_ |
-| booking_patient | `{patientId, createdAt:-1}` | Patient booking history | `IXSCAN` | _(fill in)_ |
-| booking_doctor | `{doctorId, status}` | Doctor pending list | `IXSCAN` | _(fill in)_ |
-| auditlog_booking | `{bookingId, createdAt:-1}` | Audit trail lookup | `IXSCAN` | _(fill in)_ |
+| slots_compound | `{doctorId, date, isBooked}` | Slot availability filter | `IXSCAN` | `IXSCAN` |
+| booking_patient | `{patientId, createdAt:-1}` | Patient booking history | `IXSCAN` | `IXSCAN` |
+| booking_doctor | `{doctorId, status}` | Doctor pending list | `IXSCAN` | `IXSCAN` |
+| auditlog_booking | `{bookingId, createdAt:-1}` | Audit trail lookup | `IXSCAN` | `IXSCAN` |
 
 ---
 
