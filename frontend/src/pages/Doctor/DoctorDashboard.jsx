@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import {
   Calendar, CheckCircle2, Clock, User as UserIcon, AlertCircle,
-  PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2
+  PlusCircle, Activity, FileText, Sparkles, CheckSquare, Wand2, Star
 } from 'lucide-react'
 
 const STATUS_MAP = {
@@ -30,6 +30,7 @@ export default function DoctorDashboard() {
   const [prescription, setPrescription] = useState('')
   const [saved, setSaved] = useState({})
   const [loading, setLoading] = useState(true)
+  const [ratingData, setRatingData] = useState({ average: 0, count: 0 })
 
   const [newSlot, setNewSlot] = useState({ date: '', time: '', startTime: '', endTime: '' })
   const [adding, setAdding] = useState(false)
@@ -52,6 +53,14 @@ export default function DoctorDashboard() {
   }, [user?.id])
 
   useEffect(() => { fetchSlots(viewDate) }, [user?.id, viewDate, fetchSlots])
+
+  // ── Fetch doctor's average rating ─────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return
+    axiosInstance.get(`/reviews/doctor/${user.id}`)
+      .then(r => setRatingData(r.data))
+      .catch(() => {})
+  }, [user?.id])
 
   // ── useMemo: derive stats — only recomputed when `slots` changes ──────
   // Without useMemo this object is recreated on EVERY render (including
@@ -157,7 +166,18 @@ export default function DoctorDashboard() {
 
   return (
     <DashboardLayout
-      title={`Welcome, ${user?.name ?? 'Doctor'} 👋`}
+      title={
+        <div className="flex items-center gap-4">
+          <span>Welcome, {user?.name ?? 'Doctor'} 👋</span>
+          {ratingData.count > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-sm">
+              <Star size={16} className="text-amber-500 fill-amber-500" />
+              <span className="font-bold text-amber-700">{ratingData.average}</span>
+              <span className="text-amber-600/70 text-xs font-medium">({ratingData.count} reviews)</span>
+            </div>
+          )}
+        </div>
+      }
       subtitle={`${user?.specialty ?? 'Specialist'} · Manage your schedule and patient consultations`}
     >
       {/* Stats Grid — values come from useMemo(stats) */}

@@ -4,7 +4,7 @@ import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
 import { useQueuePosition } from '../../hooks/useQueuePosition'
-import { Calendar, CheckCircle, Hash, Clock, User, AlertCircle, Activity, Download, ChevronRight } from 'lucide-react'
+import { Calendar, CheckCircle, Hash, Clock, User, AlertCircle, Activity, Download, ChevronRight, Star, X } from 'lucide-react'
 
 export default function PatientDashboard() {
   const { user } = useAuth()
@@ -20,6 +20,12 @@ export default function PatientDashboard() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [loadingBook, setLoadingBook] = useState(false)
   const [error, setError] = useState('')
+  
+  // Review Modal State
+  const [reviewBooking, setReviewBooking] = useState(null)
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [submittingReview, setSubmittingReview] = useState(false)
 
   const queueInfo = useQueuePosition(
     booked ? bookedData?.booking?.doctorId : null,
@@ -107,6 +113,28 @@ export default function PatientDashboard() {
     setBookedData(null)
   }, [])
 
+  // ── Handle Review Submission ──────────────────────────────────────────
+  const handleSubmitReview = async () => {
+    if (!reviewBooking) return
+    setSubmittingReview(true)
+    try {
+      await axiosInstance.post('/reviews', {
+        bookingId: reviewBooking._id,
+        doctorId: reviewBooking.doctorId._id,
+        rating,
+        comment
+      })
+      alert('Thank you for your review!')
+      setReviewBooking(null)
+      setRating(5)
+      setComment('')
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to submit review')
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
+
   const STATUS_CONFIG = {
     booked:    { label: 'Scheduled', class: 'bg-sky-50 text-sky-700 border-sky-200' },
     completed: { label: 'Completed', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -114,6 +142,7 @@ export default function PatientDashboard() {
   }
 
   return (
+    <>
     <DashboardLayout
       title={`Welcome, ${user?.name ?? 'Patient'}`}
       subtitle="Book a consultation or view your appointment history"
@@ -333,6 +362,12 @@ export default function PatientDashboard() {
                             <Download size={13} /> Download Prescription
                           </a>
                         )}
+                        {b.status === 'completed' && (
+                          <button onClick={() => setReviewBooking(b)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
+                            <Star size={13} /> Rate Doctor
+                          </button>
+                        )}
                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border ${sc.class}`}>{sc.label}</span>
                       </div>
                     </motion.div>
@@ -344,5 +379,45 @@ export default function PatientDashboard() {
         )}
       </AnimatePresence>
     </DashboardLayout>
+
+    {/* Review Modal */}
+    <AnimatePresence>
+      {reviewBooking && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Star size={18} className="text-amber-500 fill-amber-500"/> Rate Your Visit</h3>
+              <button onClick={() => setReviewBooking(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+            <div className="p-6 flex flex-col gap-5">
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-800">Dr. {reviewBooking.doctorId?.name}</p>
+                <p className="text-xs text-slate-500">{reviewBooking.slotId?.date}</p>
+              </div>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button key={star} onClick={() => setRating(star)} className="focus:outline-none transition-transform hover:scale-110">
+                    <Star size={32} className={star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Private Feedback</label>
+                <textarea value={comment} onChange={e => setComment(e.target.value)}
+                  placeholder="How was your consultation?"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:border-[#0284c7] text-sm resize-none h-24"
+                />
+              </div>
+              <button onClick={handleSubmitReview} disabled={submittingReview}
+                className="w-full py-3 bg-[#075985] text-white rounded-lg font-semibold text-sm hover:bg-[#0369a1] disabled:opacity-50 transition-colors">
+                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  </>
   )
 }
