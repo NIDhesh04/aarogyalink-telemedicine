@@ -40,23 +40,24 @@ node tests/threadpool-benchmark.js
 ```
 
 **What it does:**
-1. Runs 100 concurrent `bcrypt.hash` operations (CPU-bound — uses the thread pool)
-2. Records wall-clock time for all 100 operations to complete
-3. Shows difference between UV_THREADPOOL_SIZE = 4 vs 16
+1. Runs 16 concurrent `crypto.pbkdf2` operations (CPU-bound — uses the libuv thread pool)
+2. Records wall-clock time for all 16 operations to complete
+3. Shows difference between UV_THREADPOOL_SIZE = 4, 8, and 16
 
 ---
 
 ## Benchmark Methodology
 
 ```
-Test: 100 parallel bcrypt.hash(password, 10)
+Test: 16 parallel crypto.pbkdf2('password', 'salt', 100000, 64, 'sha512')
       ↓
-Each hash is CPU-bound and runs in the libuv thread pool
+Each pbkdf2 call is CPU-bound and runs in the libuv thread pool
       ↓
 UV_THREADPOOL_SIZE=4   → only 4 threads active at a time → queue builds up
+UV_THREADPOOL_SIZE=8   → 8 threads  → less queuing → faster wall time
 UV_THREADPOOL_SIZE=16  → 16 threads → minimal queuing → fastest wall time
       ↓
-Speedup = wall_clock_time_size4 / wall_clock_time_size16
+Speedup = wall_clock_time_size4 / wall_clock_time_sizeN
 ```
 
 ---
@@ -65,10 +66,11 @@ Speedup = wall_clock_time_size4 / wall_clock_time_size16
 
 | UV_THREADPOOL_SIZE | Wall-Clock Time | Speedup vs Size=4 | Notes |
 |---|---|---|---|
-| **4** (Node.js default) | 412 ms | 1.00× (baseline) | Threads saturated immediately |
-| **16** (our setting) | 138 ms | ~2.98× speedup | Optimal for this workload |
+| **4** (Node.js default) | 146.08 ms | 1.00× (baseline) | 16 tasks compete for 4 threads — heavy queuing |
+| **8** | 80.20 ms | 1.82× speedup | Queue pressure cut in half |
+| **16** (our setting) | 65.68 ms | 2.22× speedup | Optimal — all 16 tasks get a thread immediately |
 
-> **To fill in actual numbers:** Run `node tests/threadpool-benchmark.js` and paste the output above.
+> **Benchmark environment:** Node.js v24.12.0, WSL2 Ubuntu, 16 concurrent `crypto.pbkdf2` tasks × 100,000 iterations each. Run date: 2026-05-16.
 
 ---
 

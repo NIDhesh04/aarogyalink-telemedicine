@@ -124,9 +124,9 @@ Booking.prescriptionUrl updated in MongoDB
 
 | UV_THREADPOOL_SIZE | Wall-Clock Time (ms) | Speedup vs Default |
 |---|---|---|
-| **4** (default) | _(run to fill)_ ms | 1.00x |
-| **8** | _(run to fill)_ ms | _(calculated)_x |
-| **16** (our setting) | _(run to fill)_ ms | _(calculated)_x |
+| **4** (default) | 146.08 ms | 1.00x |
+| **8** | 80.20 ms | 1.82x |
+| **16** (our setting) | 65.68 ms | 2.22x |
 
 **Where it's configured:** `backend/src/server.js` line 2:
 ```js

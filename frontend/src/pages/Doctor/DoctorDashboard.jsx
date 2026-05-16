@@ -94,12 +94,20 @@ export default function DoctorDashboard() {
     if (!newSlot.date || !newSlot.time) return
     setAdding(true); setAddError(''); setAddSuccess('')
     try {
+      // Convert 12h display time (e.g. "02:00 PM") to 24h (e.g. "14:00")
+      const to24h = (t12) => {
+        const [time, period] = t12.split(' ')
+        let [h, m] = time.split(':').map(Number)
+        if (period === 'PM' && h !== 12) h += 12
+        if (period === 'AM' && h === 12) h = 0
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      }
       await axiosInstance.post('/slots', {
         doctorId: user.id,
         date: newSlot.date,
         time: newSlot.time,
-        startTime: newSlot.time.replace(' AM', '').replace(' PM', ''),
-        endTime:   newSlot.time.replace(' AM', '').replace(' PM', ''),
+        startTime: to24h(newSlot.time),
+        endTime:   to24h(newSlot.time),
       })
       setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
       setNewSlot({ date: '', time: '' })

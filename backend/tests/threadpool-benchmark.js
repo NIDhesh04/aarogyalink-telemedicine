@@ -24,7 +24,9 @@
  */
 
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
@@ -32,9 +34,9 @@ const CONCURRENT_TASKS = 16;         // Number of parallel pbkdf2 calls
 const PBKDF2_ITERATIONS = 100_000;   // CPU cost per call
 const POOL_SIZES = [4, 8, 16];       // Values to benchmark
 
-// ── Inner script that runs INSIDE a child process with a specific pool size ─
+// ── Write the worker script to a temp file (avoids node -e parsing issues) ─
 
-const INNER_SCRIPT = `
+const WORKER_SCRIPT = `
 const crypto = require('crypto');
 
 const CONCURRENT = ${CONCURRENT_TASKS};
@@ -43,8 +45,11 @@ const ITERATIONS = ${PBKDF2_ITERATIONS};
 function runPbkdf2() {
   return new Promise((resolve, reject) => {
     crypto.pbkdf2('password', 'salt', ITERATIONS, 64, 'sha512', (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
+      if (err) {
+        reject(err);
+      } else {
+        resolve(key);
+      }
     });
   });
 }
@@ -63,6 +68,9 @@ async function main() {
 main().catch(err => { console.error(err); process.exit(1); });
 `;
 
+const tmpFile = path.join(os.tmpdir(), `threadpool_worker_${process.pid}.js`);
+fs.writeFileSync(tmpFile, WORKER_SCRIPT);
+
 // ── Runner ─────────────────────────────────────────────────────────────────
 
 console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -80,7 +88,7 @@ const results = [];
 
 for (const size of POOL_SIZES) {
   // Spawn a child process with a specific UV_THREADPOOL_SIZE
-  const elapsed = execSync(`node -e "${INNER_SCRIPT.replace(/\n/g, ';')}"`, {
+  const elapsed = execSync(`node "${tmpFile}"`, {
     env: { ...process.env, UV_THREADPOOL_SIZE: String(size) },
     encoding: 'utf-8',
     timeout: 60_000,
@@ -107,3 +115,6 @@ for (const r of results) {
 console.log();
 console.log('  ✅ Done. Copy these numbers into threadpool_results.md');
 console.log();
+
+// Cleanup temp file
+try { fs.unlinkSync(tmpFile); } catch (_) {}

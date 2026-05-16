@@ -9,6 +9,7 @@ const queueSSEManager = require('../services/sse/queue.sse');
 const { addPDFJob } = require('../services/queue/pdf.queue');
 const { sendBookingConfirmation } = require('../services/mail/mail.service');
 const { scheduleReminder } = require('../services/mail/reminder.service');
+const { isSlotInPast } = require('../utils/helpers');
 
 /**
  * POST /api/bookings
@@ -30,6 +31,13 @@ const createBooking = async (req, res) => {
       { new: true }
     );
     if (!slot) return res.status(400).json({ error: 'Slot already booked or not found' });
+
+    // Reject bookings for slots whose time has already passed
+    if (isSlotInPast(slot.date, slot.startTime)) {
+      // Revert the atomic claim — slot shouldn't stay locked for a past time
+      await Slot.findByIdAndUpdate(slotId, { isBooked: false, bookedBy: null });
+      return res.status(400).json({ error: 'Cannot book a slot whose time has already passed.' });
+    }
 
     // AI Triage: if patient provided raw symptoms, generate a clinical brief
     let finalBrief = symptomBrief || '';

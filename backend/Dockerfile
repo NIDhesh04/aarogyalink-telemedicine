@@ -1,13 +1,16 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm install --omit=dev
 
 COPY . .
 
-EXPOSE 3000
+# Ensure the prescriptions output directory exists
+RUN mkdir -p public/prescriptions
 
-CMD ["npm", "run", "dev"]
+EXPOSE 5005
+
+CMD ["node", "src/server.js"]

@@ -4,11 +4,21 @@ const Slot = require('../models/Slot');
 const { client } = require('../config/redis');
 const { auth } = require('../middleware/auth');
 const { checkRole } = require('../middleware/rbac');
+const { isSlotInPast } = require('../utils/helpers');
 
 
 // Create a slot — Doctor or Admin only
 router.post('/', auth, checkRole(['doctor', 'admin']), async (req, res) => {
   try {
+    const { date, startTime } = req.body;
+
+    // Reject slots whose date+time has already passed
+    if (isSlotInPast(date, startTime)) {
+      return res.status(400).json({
+        error: 'Cannot create a slot for a time that has already passed.'
+      });
+    }
+
     const slot = await Slot.create(req.body);
     res.status(201).json(slot);
   } catch (err) {
@@ -26,7 +36,11 @@ router.get('/', auth, async (req, res) => {
     const cachedSlots = await client.get(cacheKey);
     if (cachedSlots) {
       console.log('Serving slots from Redis cache');
-      return res.json(JSON.parse(cachedSlots));
+      // Filter out past-time slots from cached results
+      const parsed = JSON.parse(cachedSlots).filter(
+        s => !isSlotInPast(s.date, s.startTime)
+      );
+      return res.json(parsed);
     }
 
     const filter = { isBooked: false };
@@ -39,7 +53,10 @@ router.get('/', auth, async (req, res) => {
     // 3. Save to Redis (expire in 5 minutes)
     await client.set(cacheKey, JSON.stringify(slots), { EX: 300 });
     
-    res.json(slots);
+    // 4. Filter out slots whose time has already passed before responding
+    const activeSlots = slots.filter(s => !isSlotInPast(s.date, s.startTime));
+    
+    res.json(activeSlots);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
