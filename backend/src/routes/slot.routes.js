@@ -46,16 +46,16 @@ router.get('/', auth, async (req, res) => {
     const filter = { isBooked: false };
     if (doctorId) filter.doctorId = doctorId;
     if (date) filter.date = date;
-    
+
     // 2. Fetch from DB
     const slots = await Slot.find(filter).populate('doctorId', 'name specialty');
-    
+
     // 3. Save to Redis (expire in 5 minutes)
     await client.set(cacheKey, JSON.stringify(slots), { EX: 300 });
-    
+
     // 4. Filter out slots whose time has already passed before responding
     const activeSlots = slots.filter(s => !isSlotInPast(s.date, s.startTime));
-    
+
     res.json(activeSlots);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -74,20 +74,34 @@ router.get('/doctor/:doctorId', auth, async (req, res) => {
       .populate('bookedBy', 'name')
       .sort({ startTime: 1 })
       .lean();
-      
-    // Attach booking data so doctor sees AI brief and can complete the session
+
+    // Fix: single query instead of N+1 loop
     const Booking = require('../models/Booking');
-    for (let slot of slots) {
+    const bookedSlotIds = slots.filter(s => s.isBooked).map(s => s._id);
+
+    const bookings = await Booking.find({ slotId: { $in: bookedSlotIds } })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Build a lookup map: slotId (string) → booking
+    const bookingBySlot = {};
+    for (const b of bookings) {
+      const key = b.slotId.toString();
+      if (!bookingBySlot[key]) bookingBySlot[key] = b; // keep latest (already sorted)
+    }
+
+    // Attach booking data to each slot in one pass
+    for (const slot of slots) {
       if (slot.isBooked) {
-        const booking = await Booking.findOne({ slotId: slot._id }).sort({ createdAt: -1 });
+        const booking = bookingBySlot[slot._id.toString()];
         if (booking) {
           slot.bookingId = booking._id;
           slot.symptomBrief = booking.symptomBrief;
-          slot.bookingStatus = booking.status; // 'booked', 'completed'
+          slot.bookingStatus = booking.status;
         }
       }
     }
-    
+
     res.json(slots);
   } catch (err) {
     res.status(500).json({ error: err.message });
