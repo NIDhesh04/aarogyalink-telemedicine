@@ -4,7 +4,7 @@ const { validateEnv } = require('./config/env');
 validateEnv(); // Fail fast if env vars are missing or malformed
 
 const express = require('express');
-const cors = require('cors');
+
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -23,34 +23,41 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 // Middleware
 
-// ── CORS must come FIRST (before helmet) so preflight OPTIONS get the right headers ──
+// ── Manual CORS middleware (Express 5 compatible — replaces cors npm package) ──
 const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'https://aarogyalink-telemedicine.vercel.app',
     'http://localhost:5173',
     'http://localhost:5005',
-    process.env.FRONTEND_URL,                          // Set on Railway if needed
-    'https://aarogyalink-telemedicine.vercel.app',     // Vercel production
-].filter(Boolean); // Remove undefined entries
+].filter(Boolean);
 
-app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        // Also allow any *.vercel.app preview deploys
-        if (origin.endsWith('.vercel.app')) return callback(null, true);
-        callback(null, true); // Allow all for now — tighten in production if needed
-    },
-    credentials: true
-}));
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (origin && origin.endsWith('.vercel.app')) {
+        // Allow Vercel preview deployments
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    // Short-circuit preflight — respond immediately with 204 No Content
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+    next();
+});
 
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },  // Allow cross-origin resource loading
-    crossOriginEmbedderPolicy: false,                        // Don't block cross-origin embeds
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
 }));
-app.use(morgan('dev'));                      // HTTP request logging (colored status codes)
+app.use(morgan('dev'));
 app.use(express.json());
-app.use(cookieParser());                    // Parse cookies (needed for JWT refresh token)
-app.use(express.static(path.join(__dirname, '../public'))); // Serve uploads & prescriptions
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
 app.use('/api/auth', authRoutes);
