@@ -167,7 +167,7 @@ const completeBooking = async (req, res) => {
     await client.zRem(`queue:${booking.doctorId._id}`, booking._id.toString());
 
     // Trigger SSE updates
-    queueSSEManager.sendDone(bookingId);
+    queueSSEManager.sendDone(booking.doctorId._id.toString(), bookingId);
     queueSSEManager.broadcastQueueUpdate(booking.doctorId._id);
 
     // Queue background PDF generation
@@ -186,6 +186,57 @@ const completeBooking = async (req, res) => {
 };
 
 /**
+ * PATCH /api/bookings/:id/cancel
+ * Cancels a booking, frees the slot, removes from Redis queue, and triggers SSE updates.
+ */
+const cancelBooking = async (req, res) => {
+  try {
+    const { id: bookingId } = req.params;
+
+    const booking = await Booking.findById(bookingId).populate('doctorId');
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.status !== 'booked') return res.status(400).json({ error: 'Only active bookings can be cancelled' });
+
+    // Update booking status
+    booking.status = 'cancelled';
+    await booking.save();
+
+    // Revert the slot to available
+    const slot = await Slot.findByIdAndUpdate(booking.slotId, {
+      isBooked: false,
+      bookedBy: null
+    });
+
+    // Remove from Redis queue
+    await client.zRem(`queue:${booking.doctorId._id}`, booking._id.toString());
+
+    // Invalidate slot caches
+    if (slot) {
+      await client.del(`slots:all:${slot.date}`);
+      await client.del(`slots:${slot.doctorId._id}:${slot.date}`);
+      await client.del(`slots:all:any`);
+      await client.del(`slots:${slot.doctorId._id}:any`);
+    }
+
+    // Trigger SSE updates
+    queueSSEManager.sendDone(booking.doctorId._id.toString(), bookingId);
+    queueSSEManager.broadcastQueueUpdate(booking.doctorId._id);
+
+    // Audit log
+    await AuditLog.create({
+      action: 'booking_cancelled',
+      performedBy: req.user ? req.user.id : booking.patientId,
+      targetId: booking._id,
+      metadata: { doctorId: booking.doctorId._id, slotId: booking.slotId }
+    });
+
+    res.json({ message: 'Booking cancelled successfully', booking });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
  * GET /api/bookings
  * Returns all bookings for the logged-in patient (via query param patientId).
  * Populates doctorId, slotId, and includes prescriptionUrl for PDF download.
@@ -198,7 +249,17 @@ const getPatientBookings = async (req, res) => {
     const bookings = await Booking.find({ patientId })
       .populate('doctorId', 'name specialty')
       .populate('slotId', 'date time')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    for (const booking of bookings) {
+      if (booking.status === 'booked' && booking.doctorId) {
+        const rank = await client.zRank(`queue:${booking.doctorId._id}`, booking._id.toString());
+        if (rank !== null) {
+          booking.queuePosition = rank + 1;
+        }
+      }
+    }
 
     res.json(bookings);
   } catch (err) {
@@ -231,4 +292,5 @@ module.exports = {
   completeBooking,
   getPatientBookings,
   getAIPrescriptionSuggestion,
+  cancelBooking,
 };
