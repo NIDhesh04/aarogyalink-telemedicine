@@ -1,9 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Teacher checklist: "AI API: prompt engineering for clinical triage"
-// Uses Google Gemini gemini-2.0-flash (fast + cost-efficient for triage)
+// Uses Google Gemini 2.5 Flash (fast + cost-efficient for triage)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 const TRIAGE_SYSTEM_PROMPT = `You are a senior clinical triage officer working in a rural telemedicine platform in India.
 Your job is to convert a patient's informal description of their symptoms into a structured, professional medical brief that a qualified district hospital doctor will read before the consultation.
