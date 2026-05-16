@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
 const AuditLog = require('../models/AuditLog');
-const User = require('../models/User');
 const { client } = require('../config/redis');
 const { generateClinicalBrief, generatePrescriptionSuggestion } = require('../services/ai/triage.service');
 const queueSSEManager = require('../services/sse/queue.sse');
@@ -77,34 +76,36 @@ const createBooking = async (req, res) => {
       metadata: { doctorId: slot.doctorId, slotId, position },
     });
 
-    // Send Email Confirmation (Async — fire and forget)
-    const patient = await User.findById(patientId);
-    if (patient && patient.email) {
-      sendBookingConfirmation(patient.email, {
-        patientName: patient.name,
+  // Send Email Confirmation — use req.user from JWT, no extra DB query needed
+  const patientName = req.user.name;
+  const patientEmail = req.user.email;
+
+  if (patientEmail) {
+    sendBookingConfirmation(patientEmail, {
+      patientName,
+      doctorName: slot.doctorId.name || 'Your Doctor',
+      date: slot.date,
+      time: slot.time
+    });
+  }
+
+  // Schedule 1-hour Reminder
+  try {
+    const slotDateTime = new Date(`${slot.date}T${slot.startTime}:00`);
+    const reminderTime = new Date(slotDateTime.getTime() - 60 * 60 * 1000);
+    const delay = reminderTime.getTime() - Date.now();
+
+    if (delay > 0 && patientEmail) {
+      await scheduleReminder(patientEmail, {
+        patientName,
         doctorName: slot.doctorId.name || 'Your Doctor',
         date: slot.date,
         time: slot.time
-      });
+      }, delay);
     }
-
-    // Schedule 1-hour Reminder
-    try {
-      const slotDateTime = new Date(`${slot.date}T${slot.startTime}:00`);
-      const reminderTime = new Date(slotDateTime.getTime() - 60 * 60 * 1000);
-      const delay = reminderTime.getTime() - Date.now();
-
-      if (delay > 0 && patient && patient.email) {
-        await scheduleReminder(patient.email, {
-          patientName: patient.name,
-          doctorName: slot.doctorId.name || 'Your Doctor',
-          date: slot.date,
-          time: slot.time
-        }, delay);
-      }
-    } catch (err) {
-      console.error('Reminder scheduling failed:', err);
-    }
+  } catch (err) {
+    console.error('Reminder scheduling failed:', err);
+  }
 
     res.status(201).json({ message: 'Booking successful', booking, queuePos: position });
   } catch (err) {
