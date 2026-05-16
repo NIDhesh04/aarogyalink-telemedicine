@@ -1,11 +1,9 @@
 const { Queue } = require('bullmq');
+const IORedis = require('ioredis');
 
-const pdfQueue = new Queue('pdf-generation', {
-  connection: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-  }
-});
+const connection = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+
+const pdfQueue = new Queue('pdf-generation', { connection });
 
 /**
  * Adds a PDF generation job to the queue.

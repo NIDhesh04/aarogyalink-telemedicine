@@ -61,6 +61,9 @@ function generatePDFInThread(data) {
 
 // ─── BullMQ worker (consumes from the "pdf-generation" queue) ──────
 
+const IORedis = require('ioredis');
+const connection = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+
 const pdfWorker = new BullMQWorker(
   'pdf-generation',
   async (job) => {
@@ -86,10 +89,7 @@ const pdfWorker = new BullMQWorker(
     return { filePath: absolutePath, prescriptionUrl };
   },
   {
-    connection: {
-      host: process.env.REDIS_HOST || '127.0.0.1',
-      port: process.env.REDIS_PORT || 6379,
-    },
+    connection,
     concurrency: 5, // Up to 5 parallel worker threads for PDF jobs
   }
 );

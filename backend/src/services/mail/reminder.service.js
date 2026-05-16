@@ -1,12 +1,10 @@
 const { Queue, Worker } = require('bullmq');
 const { sendBookingConfirmation } = require('./mail.service'); // Reuse confirmation for simplicity or create sendReminder
+const IORedis = require('ioredis');
 
-const reminderQueue = new Queue('email-reminders', {
-  connection: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-  }
-});
+const connection = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+
+const reminderQueue = new Queue('email-reminders', { connection });
 
 /**
  * Schedules a reminder email.
@@ -25,12 +23,7 @@ const reminderWorker = new Worker('email-reminders', async (job) => {
   console.log(`Sending reminder to ${to}`);
   // In a real app, you'd use a different template for reminders
   await sendBookingConfirmation(to, { ...details, subject: 'Reminder: Your Consultation is in 1 Hour' });
-}, {
-  connection: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-  }
-});
+}, { connection });
 
 module.exports = {
   scheduleReminder,
