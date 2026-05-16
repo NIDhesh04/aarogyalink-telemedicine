@@ -44,9 +44,12 @@ const createBooking = async (req, res) => {
       finalBrief = await generateClinicalBrief(req.body.rawSymptoms);
     }
 
+    const videoLink = `https://meet.jit.si/aarogyalink-${slotId}-${Date.now()}`
+      
     const booking = await Booking.create({
       slotId, patientId, doctorId: slot.doctorId,
       symptomBrief: finalBrief,
+      videoLink,
     });
 
     // Invalidate slot availability cache
