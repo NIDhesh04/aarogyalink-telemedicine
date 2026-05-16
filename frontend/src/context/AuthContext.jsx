@@ -31,11 +31,17 @@ export function AuthProvider({ children }) {
     return data.user
   }, [])
 
-  const logout = useCallback(() => {
-    setUser(null)
-    localStorage.removeItem('aarogya_user')
-    localStorage.removeItem('aarogya_token')
-    delete axiosInstance.defaults.headers.common['Authorization']
+  const logout = useCallback(async () => {
+    try {
+      await axiosInstance.post('/auth/logout')
+    } catch {
+      // even if the server call fails, clear client state
+    } finally {
+      setUser(null)
+      localStorage.removeItem('aarogya_user')
+      localStorage.removeItem('aarogya_token')
+      delete axiosInstance.defaults.headers.common['Authorization']
+    }
   }, [])
 
   return (
