@@ -102,12 +102,23 @@ export default function DoctorDashboard() {
         if (period === 'AM' && h === 12) h = 0
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       }
+    
+      // Calculate endTime as startTime + 30 minutes
+      const calcEndTime = (start24) => {
+        const [h, m] = start24.split(':').map(Number)
+        const totalMins = h * 60 + m + 30
+        return `${String(Math.floor(totalMins / 60)).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}`
+      }
+    
+      const startTime = to24h(newSlot.time)
+      const endTime   = calcEndTime(startTime)
+    
       await axiosInstance.post('/slots', {
-        doctorId: user.id,
-        date: newSlot.date,
-        time: newSlot.time,
-        startTime: to24h(newSlot.time),
-        endTime:   to24h(newSlot.time),
+        doctorId:  user.id,
+        date:      newSlot.date,
+        time:      newSlot.time,
+        startTime,
+        endTime,
       })
       setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
       setNewSlot({ date: '', time: '' })
