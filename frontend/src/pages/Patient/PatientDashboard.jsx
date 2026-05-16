@@ -359,7 +359,7 @@ export default function PatientDashboard() {
                       </div>
                       <div className="flex items-center gap-3 ml-13 sm:ml-0">
                         {b.prescriptionUrl && (
-                          <a href={`http://localhost:5005${b.prescriptionUrl}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`${(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5005/api').replace(/\/api$/, '')}${b.prescriptionUrl}`} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
                             <Download size={13} /> Download Prescription
                           </a>
