@@ -364,6 +364,12 @@ export default function PatientDashboard() {
                             <Download size={13} /> Download Prescription
                           </a>
                         )}
+                        {b.videoLink && b.status === 'booked' && (
+                          <a href={b.videoLink} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                            🎥 Join Video Call
+                          </a>
+                        )}
                         {b.status === 'completed' && (
                           <button onClick={() => setReviewBooking(b)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">

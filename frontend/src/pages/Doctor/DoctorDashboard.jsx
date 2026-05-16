@@ -393,6 +393,20 @@ export default function DoctorDashboard() {
                     </div>
                   )}
 
+                  {/* Video Call */}
+                  {selected.isBooked && selected.videoLink && (
+                    <div className="mb-6">
+                      <a
+                        href={selected.videoLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm"
+                      >
+                        🎥 Start Video Call
+                      </a>
+                    </div>
+                  )}
+
                   {/* Prescription Section */}
                   {selected.isBooked && (
                     <div className="flex flex-col flex-1">
