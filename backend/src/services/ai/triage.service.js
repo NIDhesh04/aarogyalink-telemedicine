@@ -1,9 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Teacher checklist: "AI API: prompt engineering for clinical triage"
-// Uses Google Gemini gemini-2.0-flash (fast + cost-efficient for triage)
+// Uses Google Gemini 2.5 Flash (fast + cost-efficient for triage)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 const TRIAGE_SYSTEM_PROMPT = `You are a senior clinical triage officer working in a rural telemedicine platform in India.
 Your job is to convert a patient's informal description of their symptoms into a structured, professional medical brief that a qualified district hospital doctor will read before the consultation.
@@ -60,14 +60,8 @@ const generateClinicalBrief = async (rawSymptoms) => {
   }
 
   try {
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${TRIAGE_SYSTEM_PROMPT}\n\nPatient's own words: "${rawSymptoms}"\n\nGenerate the clinical brief:` }],
-        },
-      ],
-    });
+    const prompt = `${TRIAGE_SYSTEM_PROMPT}\n\nPatient's own words: "${rawSymptoms}"\n\nGenerate the clinical brief:`;
+    const result = await model.generateContent(prompt);
 
     return result.response.text();
   } catch (error) {
@@ -90,14 +84,8 @@ const generatePrescriptionSuggestion = async (symptomBrief) => {
   }
 
   try {
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${PRESCRIPTION_SYSTEM_PROMPT}\n\nPatient Clinical Brief:\n${symptomBrief}\n\nGenerate the prescription suggestion for the doctor to review:` }],
-        },
-      ],
-    });
+    const prompt = `${PRESCRIPTION_SYSTEM_PROMPT}\n\nPatient Clinical Brief:\n${symptomBrief}\n\nGenerate the prescription suggestion for the doctor to review:`;
+    const result = await model.generateContent(prompt);
 
     return result.response.text();
   } catch (error) {
