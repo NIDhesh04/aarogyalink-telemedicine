@@ -7,7 +7,8 @@ const slotSchema = new mongoose.Schema({
   endTime: { type: String, required: true },
   time: { type: String }, // Display string e.g. "10:00 AM"
   isBooked: { type: Boolean, default: false },
-  bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }
+  bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
 slotSchema.index({ doctorId: 1, date: 1, isBooked: 1 });

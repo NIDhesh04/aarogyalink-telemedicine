@@ -43,7 +43,7 @@ router.get('/', auth, async (req, res) => {
       return res.json(parsed);
     }
 
-    const filter = { isBooked: false };
+    const filter = { isBooked: false, isActive: { $ne: false } };
     if (doctorId) filter.doctorId = doctorId;
     if (date) filter.date = date;
 
@@ -67,7 +67,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/doctor/:doctorId', auth, async (req, res) => {
   try {
     const { date } = req.query;
-    const filter = { doctorId: req.params.doctorId };
+    const filter = { doctorId: req.params.doctorId, isActive: { $ne: false } };
     if (date) filter.date = date;
     const slots = await Slot.find(filter)
       .populate('doctorId', 'name specialty')
@@ -104,6 +104,36 @@ router.get('/doctor/:doctorId', auth, async (req, res) => {
     }
 
     res.json(slots);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Deactivate a slot (soft delete) — Doctor or Admin only
+router.patch('/:id/deactivate', auth, checkRole(['doctor', 'admin']), async (req, res) => {
+  try {
+    const slot = await Slot.findById(req.params.id);
+    if (!slot) return res.status(404).json({ error: 'Slot not found' });
+    
+    // Only allow doctor to delete their own slots unless they are an admin
+    if (req.user.role === 'doctor' && slot.doctorId.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to deactivate this slot' });
+    }
+
+    if (slot.isBooked) {
+      return res.status(400).json({ error: 'Cannot deactivate a booked slot' });
+    }
+
+    slot.isActive = false;
+    await slot.save();
+
+    // Invalidate caches
+    await client.del(`slots:all:${slot.date}`);
+    await client.del(`slots:${slot.doctorId}:${slot.date}`);
+    await client.del(`slots:all:any`);
+    await client.del(`slots:${slot.doctorId}:any`);
+
+    res.json({ message: 'Slot deactivated successfully', slot });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
