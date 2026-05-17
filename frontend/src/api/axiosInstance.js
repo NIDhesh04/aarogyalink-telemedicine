@@ -55,8 +55,14 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // Only handle 401s that haven't already been retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Only handle 401s that haven't already been retried, and are not from auth login/refresh/register
+    if (
+      error.response?.status === 401 && 
+      !originalRequest._retry &&
+      !originalRequest.url.includes('/auth/login') &&
+      !originalRequest.url.includes('/auth/register') &&
+      !originalRequest.url.includes('/auth/refresh')
+    ) {
 
       // If a refresh is already in-flight, queue this request until it resolves
       if (isRefreshing) {
