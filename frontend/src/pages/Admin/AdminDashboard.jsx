@@ -55,7 +55,7 @@ export default function AdminDashboard() {
     Promise.all([
       axiosInstance.get('/users/doctors').then(r => setDoctors(r.data)),
       axiosInstance.get('/admin/stats').then(r => setStats(r.data)),
-      axiosInstance.get('/admin/audit-log').then(r => setAuditLogs(r.data)),
+      axiosInstance.get('/admin/audit-log').then(r => setAuditLogs(r.data.logs || [])),
       axiosInstance.get('/admin/analytics').then(r => {
         setAnalytics(r.data.weeklyBookings.map(d => ({ day: d.day, bookings: d.count })))
         setTotalWeekly(r.data.total)
