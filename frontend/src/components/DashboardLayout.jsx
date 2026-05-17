@@ -37,12 +37,12 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
   return (
     <div className="min-h-screen flex font-sans bg-[#f0f4f8] dark:bg-slate-950 transition-colors duration-200">
-      {/* Mobile overlay */}
+      {/* Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/30 z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/30 z-40"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -50,7 +50,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static top-0 left-0 h-full w-60 bg-[#075985] dark:bg-slate-900 z-50 flex flex-col transition-all duration-200 border-r border-transparent dark:border-slate-800 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`fixed top-0 left-0 h-full w-60 bg-[#075985] dark:bg-slate-900 z-50 flex flex-col transition-all duration-200 border-r border-transparent dark:border-slate-800 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
         <div className="px-5 py-5 flex items-center gap-3 border-b border-white/10">
@@ -58,7 +58,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
             <Cross size={15} className="text-white" strokeWidth={2.5} />
           </div>
           <span className="text-white font-semibold tracking-tight text-base">AarogyaLink</span>
-          <button className="ml-auto lg:hidden text-white/60 hover:text-white" onClick={() => setSidebarOpen(false)}>
+          <button className="ml-auto text-white/60 hover:text-white" onClick={() => setSidebarOpen(false)}>
             <X size={18} />
           </button>
         </div>
@@ -103,7 +103,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
         {/* Top bar */}
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 lg:px-8 shrink-0 sticky top-0 z-30 transition-colors duration-200">
           <button
-            className="p-1.5 mr-4 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 lg:hidden transition-colors"
+            className="p-1.5 mr-4 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={20} />
