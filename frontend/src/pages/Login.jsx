@@ -38,7 +38,8 @@ export default function Login() {
   const [mode, setMode] = useState('select')
   const [selectedRole, setSelectedRole] = useState(null)
   const [isRegister, setIsRegister] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', specialty: '', phone: '' })
+  const [certificateFile, setCertificateFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { t, i18n } = useTranslation()
@@ -62,9 +63,22 @@ export default function Login() {
     setError('')
     try {
       if (isRegister) {
-        await register({ ...form, role: selectedRole.key })
+        if (selectedRole.key === 'doctor' && certificateFile) {
+          // send as form data if doctor
+          const formData = new FormData()
+          formData.append('name', form.name)
+          formData.append('email', form.email)
+          formData.append('password', form.password)
+          formData.append('role', selectedRole.key)
+          formData.append('specialty', form.specialty)
+          formData.append('phone', form.phone)
+          formData.append('certificate', certificateFile)
+          await register(formData)
+        } else {
+          await register({ ...form, role: selectedRole.key })
+        }
       } else {
-        await login(form.email, form.password)
+        await login(form.email, form.password, selectedRole.key)
       }
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Authentication failed. Please try again.')
@@ -173,7 +187,7 @@ export default function Login() {
                   {/* Back + role badge */}
                   <div className="flex items-center justify-between mb-5">
                     <button
-                      onClick={() => { setMode('select'); setError(''); setForm({ name: '', email: '', password: '', specialty: '' }) }}
+                      onClick={() => { setMode('select'); setError(''); setForm({ name: '', email: '', password: '', specialty: '', phone: '' }); setCertificateFile(null); setIsRegister(false) }}
                       className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-medium"
                     >
                       <ArrowLeft size={15} /> {t('Back')}
@@ -184,29 +198,42 @@ export default function Login() {
                   </div>
 
                   {/* Sign In / Register tabs */}
-                  <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 mb-6">
-                    {[[t('Sign In'), false], [t('Register'), true]].map(([label, val]) => (
-                      <button
-                        key={label}
-                        onClick={() => { setIsRegister(val); setError('') }}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${isRegister === val ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  {selectedRole?.key !== 'admin' && (
+                    <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 mb-6">
+                      {[[t('Sign In'), false], [t('Register'), true]].map(([label, val]) => (
+                        <button
+                          key={label}
+                          onClick={() => { setIsRegister(val); setError('') }}
+                          className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${isRegister === val ? 'bg-[#075985] text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <AnimatePresence>
                       {isRegister && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Full Name')}</label>
-                          <input
-                            type="text" required value={form.name}
-                            onChange={e => setForm({ ...form, name: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
-                            placeholder={t('Full Name')}
-                          />
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Full Name')}</label>
+                            <input
+                              type="text" required value={form.name}
+                              onChange={e => setForm({ ...form, name: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                              placeholder={t('Full Name')}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Phone Number')}</label>
+                            <input
+                              type="text" required value={form.phone}
+                              onChange={e => setForm({ ...form, phone: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                              placeholder="+91 9876543210"
+                            />
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -233,14 +260,24 @@ export default function Login() {
 
                     <AnimatePresence>
                       {isRegister && selectedRole?.key === 'doctor' && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Medical Specialty')}</label>
-                          <input
-                            type="text" required value={form.specialty}
-                            onChange={e => setForm({ ...form, specialty: e.target.value })}
-                            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
-                            placeholder="e.g. General Medicine"
-                          />
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Medical Specialty')}</label>
+                            <input
+                              type="text" required value={form.specialty}
+                              onChange={e => setForm({ ...form, specialty: e.target.value })}
+                              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                              placeholder="e.g. General Medicine"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-1.5">{t('Upload Certificate')}</label>
+                            <input
+                              type="file" required onChange={e => setCertificateFile(e.target.files[0])}
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0284c7]/40 focus:border-[#0284c7] text-sm transition-all"
+                            />
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>

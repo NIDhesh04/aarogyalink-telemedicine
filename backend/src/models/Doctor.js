@@ -14,6 +14,7 @@ const doctorSchema = new mongoose.Schema({
     default: [],
   },
   profilePhoto: { type: String, default: null },
+  certificateUrl: { type: String, default: null },
 }, { timestamps: true });
 
 //doctorSchema.index({ userId: 1 }, { unique: true });

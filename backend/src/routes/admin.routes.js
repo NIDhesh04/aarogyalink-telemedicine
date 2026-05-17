@@ -145,4 +145,47 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/pending-users
+ * Fetch users with status 'pending'
+ */
+router.get('/pending-users', async (req, res) => {
+  try {
+    const pendingUsers = await User.find({ status: 'pending' }).select('-password').lean();
+    
+    // Attach doctor details if role is doctor
+    for (let i = 0; i < pendingUsers.length; i++) {
+      if (pendingUsers[i].role === 'doctor') {
+        const doc = await Doctor.findOne({ userId: pendingUsers[i]._id });
+        if (doc) {
+          pendingUsers[i].specialty = doc.specialty;
+          pendingUsers[i].certificateUrl = doc.certificateUrl;
+        }
+      }
+    }
+    
+    res.json(pendingUsers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:id/status
+ * Update user status
+ */
+router.put('/users/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['active', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
