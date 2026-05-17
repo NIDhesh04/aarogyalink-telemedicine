@@ -11,8 +11,8 @@ export function AuthProvider({ children }) {
     } catch { return null }
   })
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await axiosInstance.post('/auth/login', { email, password })
+  const login = useCallback(async (email, password, role) => {
+    const { data } = await axiosInstance.post('/auth/login', { email, password, role })
     const token = data.accessToken || data.token
     setUser(data.user)
     localStorage.setItem('aarogya_user', JSON.stringify(data.user))

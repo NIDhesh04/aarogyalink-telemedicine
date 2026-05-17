@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
+const { upload } = require('../middleware/upload');
 
 // ── Token Helpers ──────────────────────────────────────────────
 
@@ -33,9 +34,9 @@ const setRefreshCookie = (res, refreshToken) => {
 
 // ── POST /api/auth/register ────────────────────────────────────
 
-router.post('/register', async (req, res) => {
+router.post('/register', upload.single('certificate'), async (req, res) => {
   try {
-    const { name, email, password, role, specialty } = req.body;
+    const { name, email, password, role, specialty, phone } = req.body;
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({
@@ -44,7 +45,14 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const validRoles = ['patient', 'doctor', 'asha', 'admin'];
+    if (role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Registration as administrator is not allowed.'
+      });
+    }
+
+    const validRoles = ['patient', 'doctor', 'asha'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
@@ -60,12 +68,24 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const user = await User.create({ name, email, password, role });
+    const status = (role === 'doctor' || role === 'asha') ? 'pending' : 'active';
+
+    const user = await User.create({ name, email, password, role, phone, status });
 
     if (role === 'doctor') {
+      const certificateUrl = req.file ? `/uploads/profiles/${req.file.filename}` : null;
       await Doctor.create({
         userId: user._id,
-        specialty: specialty || 'General Medicine'
+        specialty: specialty || 'General Medicine',
+        certificateUrl
+      });
+    }
+
+    // Do not log in immediately if pending
+    if (status === 'pending') {
+      return res.status(201).json({
+        success: true,
+        message: 'Registration successful. Account is pending admin approval.',
       });
     }
 
@@ -90,20 +110,62 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required.'
+        message: 'Email, password, and role are required.'
       });
     }
 
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
+
+    if (role === 'admin') {
+      const allowedAdminEmails = process.env.ADMIN_EMAILS 
+        ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) 
+        : [];
+      
+      if (!allowedAdminEmails.includes(email.toLowerCase())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized admin login.'
+        });
+      }
+      
+      const adminSecretPassword = process.env.ADMIN_PASSWORD || '123456';
+      
+      // Auto-create admin if not exists, so they can login with the configured password
+      if (!user && password === adminSecretPassword) {
+        user = await User.create({ name: 'Admin', email: email.toLowerCase(), password: adminSecretPassword, role: 'admin', status: 'active' });
+      }
+    }
+
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password.'
+      });
+    }
+
+    if (user.role !== role) {
+      return res.status(401).json({
+        success: false,
+        message: `Invalid login for this role. You are registered as ${user.role}.`
+      });
+    }
+
+
+
+    if (user.status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is pending admin approval. Please wait for confirmation.'
+      });
+    } else if (user.status === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account request was rejected by the admin.'
       });
     }
 
