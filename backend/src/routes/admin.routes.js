@@ -96,11 +96,30 @@ router.get('/schedule/:doctorId', async (req, res) => {
  */
 router.get('/audit-log', async (req, res) => {
   try {
-    const logs = await AuditLog.find()
-      .populate('performedBy', 'name role')
-      .sort({ createdAt: -1 })
-      .limit(50);
-    res.json(logs);
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const skip  = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find()
+        .populate('performedBy', 'name role')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      AuditLog.countDocuments(),
+    ]);
+
+    res.json({
+      logs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

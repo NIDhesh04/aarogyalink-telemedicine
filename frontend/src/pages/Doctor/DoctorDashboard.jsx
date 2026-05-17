@@ -80,8 +80,8 @@ export default function DoctorDashboard() {
   // textarea.
   const sortedSlots = useMemo(() => {
     return [...slots].sort((a, b) => {
-      const t1 = a.time || a.startTime || ''
-      const t2 = b.time || b.startTime || ''
+      const t1 = a.startTime || a.time || ''
+      const t2 = b.startTime || b.time || ''
       return t1.localeCompare(t2)
     })
   }, [slots])
@@ -102,12 +102,23 @@ export default function DoctorDashboard() {
         if (period === 'AM' && h === 12) h = 0
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       }
+    
+      // Calculate endTime as startTime + 30 minutes
+      const calcEndTime = (start24) => {
+        const [h, m] = start24.split(':').map(Number)
+        const totalMins = h * 60 + m + 30
+        return `${String(Math.floor(totalMins / 60)).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}`
+      }
+    
+      const startTime = to24h(newSlot.time)
+      const endTime   = calcEndTime(startTime)
+    
       await axiosInstance.post('/slots', {
-        doctorId: user.id,
-        date: newSlot.date,
-        time: newSlot.time,
-        startTime: to24h(newSlot.time),
-        endTime:   to24h(newSlot.time),
+        doctorId:  user.id,
+        date:      newSlot.date,
+        time:      newSlot.time,
+        startTime,
+        endTime,
       })
       setAddSuccess(`✅ Slot added for ${newSlot.date} at ${newSlot.time}`)
       setNewSlot({ date: '', time: '' })
@@ -157,6 +168,19 @@ export default function DoctorDashboard() {
       alert('Failed to complete consultation. Please try again.')
     }
   }, [prescription, saved, selected, viewDate, fetchSlots])
+
+  // ── Deactivate open slot ─────────────────────────────────────────────
+  const handleDeactivate = useCallback(async () => {
+    if (!selected || selected.isBooked) return
+    if (!window.confirm('Are you sure you want to deactivate this open slot?')) return
+    try {
+      await axiosInstance.patch(`/slots/${selected._id}/deactivate`)
+      setSelected(null)
+      fetchSlots(viewDate)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to deactivate slot')
+    }
+  }, [selected, viewDate, fetchSlots])
 
   // ── Stat card component (defined outside render to avoid re-creation) ─
   const StatCard = useCallback(({ icon: Icon, value, label, colorClass, delay }) => (
@@ -382,6 +406,20 @@ export default function DoctorDashboard() {
                     </div>
                   )}
 
+                  {/* Video Call */}
+                  {selected.isBooked && selected.videoLink && (
+                    <div className="mb-6">
+                      <a
+                        href={selected.videoLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm"
+                      >
+                        🎥 Start Video Call
+                      </a>
+                    </div>
+                  )}
+
                   {/* Prescription Section */}
                   {selected.isBooked && (
                     <div className="flex flex-col flex-1">
@@ -439,8 +477,14 @@ export default function DoctorDashboard() {
                   )}
 
                   {!selected.isBooked && (
-                    <div className="flex flex-col items-center justify-center flex-1 text-center opacity-60">
-                      <p className="text-sm font-medium text-slate-500">This slot is still open. Patients can book it from their dashboard.</p>
+                    <div className="flex flex-col items-center justify-center flex-1 text-center">
+                      <p className="text-sm font-medium text-slate-500 mb-6 opacity-60">This slot is still open. Patients can book it from their dashboard.</p>
+                      <button
+                        onClick={handleDeactivate}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg transition-colors border border-red-200 dark:border-red-900/50"
+                      >
+                        <AlertCircle size={16} /> Deactivate Slot
+                      </button>
                     </div>
                   )}
                 </div>

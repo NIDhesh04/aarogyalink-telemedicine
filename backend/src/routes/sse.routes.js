@@ -7,8 +7,8 @@ const queueSSEManager = require('../services/sse/queue.sse');
  * GET /api/sse/queue/:doctorId/:bookingId
  */
 router.get('/queue/:doctorId/:bookingId', (req, res) => {
-  const { bookingId } = req.params;
-  queueSSEManager.addClient(bookingId, res);
+  const { doctorId, bookingId } = req.params;
+  queueSSEManager.addClient(doctorId, bookingId, res);
 });
 
 /**
@@ -17,7 +17,7 @@ router.get('/queue/:doctorId/:bookingId', (req, res) => {
  */
 router.get('/overview/:doctorId', (req, res) => {
   const { doctorId } = req.params;
-  queueSSEManager.addClient(`doctor:${doctorId}`, res);
+  queueSSEManager.addClient(doctorId, 'doctor', res);
 });
 
 module.exports = router;

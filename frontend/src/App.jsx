@@ -21,20 +21,28 @@ function RequireAuth({ children }) {
   return children
 }
 
+function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/patient" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
+        <Route path="/doctor"  element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
+        <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<RequireAuth><ProfileSettings /></RequireAuth>} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
 function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/patient" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
-          <Route path="/doctor"  element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
-          <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
-          <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/profile" element={<RequireAuth><ProfileSettings /></RequireAuth>} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </ThemeProvider>
   )
 }

@@ -9,6 +9,7 @@ const {
   completeBooking,
   getPatientBookings,
   getAIPrescriptionSuggestion,
+  cancelBooking,
 } = require('../controllers/booking.controller');
 
 // ─── GET /api/bookings?patientId=xxx ─── Patient only ────────────────────────
@@ -28,5 +29,8 @@ router.get('/position/:doctorId/:bookingId', auth, checkRole(['patient', 'asha']
 
 // ─── POST /api/bookings/complete/:bookingId ─── Doctor only ──────────────────
 router.post('/complete/:bookingId', auth, checkRole(['doctor']), completeBooking);
+
+// ─── PATCH /api/bookings/:id/cancel ─── Patient, ASHA, or Admin ──────────────
+router.patch('/:id/cancel', auth, checkRole(['patient', 'asha', 'admin', 'doctor']), cancelBooking);
 
 module.exports = router;

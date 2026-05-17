@@ -1,21 +1,3 @@
-/**
- * AarogyaLink — End-to-End Integration Tests
- * Tests the full booking lifecycle: Register → Slot → Book → Queue → Complete → PDF
- *
- * Teammate 3 (Infrastructure)
- *
- * Strategy:
- *   • MongoDB and Redis run for real — we verify actual DB state changes.
- *   • Nodemailer is mocked to prevent sending real emails.
- *   • BullMQ is mocked so we can assert queue interactions without a
- *     live worker, but we verify the mock was called with the right data.
- *   • The Gemini/Claude AI SDK is mocked to avoid external API calls.
- *   • All protected routes include auth headers (JWT Bearer tokens).
- *
- * Prerequisites: MongoDB and Redis must be running locally.
- * Run with: npm test -- tests/e2e.test.js
- */
-
 /* ─── Test environment variables (set BEFORE any app code loads) ─────────── */
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3001';
@@ -348,6 +330,60 @@ describe('AarogyaLink E2E — Full Booking Lifecycle', () => {
         .expect(400);
     });
 
+    it('should handle truly concurrent booking attempts — only one wins', async () => {
+      // Register a second patient
+      const res2 = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Meena Test Devi',
+          email: 'meena.test@patient.com',
+          password: 'securepass123',
+          role: 'patient',
+        });
+      const patient2Token = res2.body.accessToken;
+      const patient2Id    = res2.body.user.id;
+      
+      // Create a fresh unbooked slot for this test
+      const freshSlotRes = await request(app)
+        .post('/api/slots')
+        .set('Authorization', authHeader(state.doctorAccessToken))
+        .send({
+          doctorId:  state.doctorId,
+          date:      new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+          time:      '03:00 PM',
+          startTime: '15:00',
+          endTime:   '15:30',
+        });
+      const freshSlotId = freshSlotRes.body._id;
+      
+      // Fire BOTH requests at exactly the same time — true concurrency
+      const [r1, r2] = await Promise.all([
+        request(app)
+          .post('/api/bookings')
+          .set('Authorization', authHeader(state.patientAccessToken))
+          .send({ slotId: freshSlotId, patientId: state.patientId, symptomBrief: 'Patient 1 concurrent attempt' }),
+        request(app)
+          .post('/api/bookings')
+          .set('Authorization', authHeader(patient2Token))
+          .send({ slotId: freshSlotId, patientId: patient2Id, symptomBrief: 'Patient 2 concurrent attempt' }),
+      ]);
+    
+      const statuses = [r1.status, r2.status];
+      console.log(`[Race Test] P1: ${r1.status}, P2: ${r2.status} — exactly one wins`);
+    
+      // Exactly one must succeed, exactly one must fail
+      expect(statuses).toContain(201);
+      expect(statuses).toContain(400);
+    
+      // Verify DB — slot booked exactly once
+      const dbSlot = await Slot.findById(freshSlotId);
+      expect(dbSlot.isBooked).toBe(true);
+    
+      // Verify only one booking exists for this slot in DB
+      const bookings = await Booking.find({ slotId: freshSlotId });
+      expect(bookings.length).toBe(1);
+    });
+    
     it('should reject booking without patientId', async () => {
       await request(app)
         .post('/api/bookings')

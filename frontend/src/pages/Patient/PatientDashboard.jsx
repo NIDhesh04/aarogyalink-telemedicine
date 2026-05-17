@@ -70,9 +70,9 @@ export default function PatientDashboard() {
   // re-sort when the raw `slots` array actually changes.
   const sortedSlots = useMemo(() => {
     return [...slots].sort((a, b) => {
-      // Sort by time string (HH:MM AM/PM format is sortable lexicographically)
-      const t1 = a.time || a.startTime || ''
-      const t2 = b.time || b.startTime || ''
+      // Sort by startTime (24h format, e.g., "14:00") which sorts correctly lexicographically
+      const t1 = a.startTime || a.time || ''
+      const t2 = b.startTime || b.time || ''
       return t1.localeCompare(t2)
     })
   }, [slots])
@@ -154,7 +154,7 @@ export default function PatientDashboard() {
         {[
           { icon: Calendar,     value: bookingStats.upcoming,           label: t('Scheduled Appointments'),   color: 'text-sky-700 bg-sky-50 border-sky-100' },
           { icon: CheckCircle,  value: bookingStats.completed,          label: t('Completed Consultations'),  color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-          { icon: Hash,         value: bookedData?.queuePos ?? '—',     label: t('Current Queue Position'),   color: 'text-violet-700 bg-violet-50 border-violet-100' },
+          { icon: Hash,         value: queueInfo.position ?? bookedData?.queuePos ?? '—',     label: t('Current Queue Position'),   color: 'text-violet-700 bg-violet-50 border-violet-100' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 flex items-center gap-4 transition-colors">
@@ -264,12 +264,24 @@ export default function PatientDashboard() {
                       </div>
                     )}
 
-                    <button
-                      onClick={handleReset}
-                      className="px-5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      Book Another Consultation
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
+                      {bookedData?.booking?.videoLink && (
+                        <a
+                          href={bookedData.booking.videoLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-5 py-2.5 rounded-lg border border-blue-200 dark:border-blue-900/50 text-sm font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-2"
+                        >
+                          🎥 Join Video Call
+                        </a>
+                      )}
+                      <button
+                        onClick={handleReset}
+                        className="px-5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        Book Another Consultation
+                      </button>
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
@@ -364,11 +376,22 @@ export default function PatientDashboard() {
                             <Download size={13} /> Download Prescription
                           </a>
                         )}
+                        {b.videoLink && b.status === 'booked' && (
+                          <a href={b.videoLink} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                            🎥 Join Video Call
+                          </a>
+                        )}
                         {b.status === 'completed' && (
                           <button onClick={() => setReviewBooking(b)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
                             <Star size={13} /> Rate Doctor
                           </button>
+                        )}
+                        {b.status === 'booked' && b.queuePosition !== undefined && (
+                          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/50">
+                            <Hash size={11} /> Pos: #{b.queuePosition}
+                          </span>
                         )}
                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border ${sc.class}`}>{sc.label}</span>
                       </div>

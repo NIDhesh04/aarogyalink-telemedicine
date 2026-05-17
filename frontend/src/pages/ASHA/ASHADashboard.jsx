@@ -29,6 +29,7 @@ export default function ASHADashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [slots, setSlots] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
   const { t } = useTranslation()
 
   const today = new Date().toISOString().split('T')[0]
@@ -89,6 +90,11 @@ export default function ASHADashboard() {
   const criticalCount = patients.filter(p => deriveStatus(p) === 'critical').length
   const followupCount = patients.filter(p => deriveStatus(p) === 'followup').length
 
+  const filteredPatients = patients.filter(p => 
+    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    p.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <DashboardLayout
       title={t('ASHA Worker')}
@@ -127,21 +133,29 @@ export default function ASHADashboard() {
               <RefreshCw size={14} />
             </button>
           </div>
+          <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+            <input
+              type="text"
+              placeholder="Search patients by name or email..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/20 outline-none transition-all text-slate-700 dark:text-slate-200"
+            />
+          </div>
 
           {loadingPatients ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2">
               <div className="w-6 h-6 border-2 border-slate-200 border-t-amber-500 rounded-full animate-spin" />
               <p className="text-xs text-slate-400 font-medium">Loading patients...</p>
             </div>
-          ) : patients.length === 0 ? (
+          ) : filteredPatients.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center px-6">
               <Users size={28} className="text-slate-300 mb-2" />
-              <p className="text-sm text-slate-400 font-medium">No patients assigned yet.</p>
-              <p className="text-xs text-slate-400 mt-1">Patients registered in the system will appear here.</p>
+              <p className="text-sm text-slate-400 font-medium">No patients found.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto max-h-[500px]">
-              {patients.map((p) => {
+              {filteredPatients.map((p) => {
                 const status = deriveStatus(p)
                 const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.stable
                 const isSelected = selectedPatient?._id === p._id

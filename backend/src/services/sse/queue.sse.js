@@ -6,15 +6,16 @@ const { client } = require('../../config/redis');
  */
 class QueueSSEManager {
   constructor() {
-    this.clients = new Map(); // userId -> response object
+    this.clients = new Map(); // doctorId -> Map(bookingId -> res)
   }
 
   /**
    * Adds a new SSE client connection.
-   * @param {string} userId - Unique ID for the patient or doctor.
+   * @param {string} doctorId - Doctor's ID.
+   * @param {string} bookingId - Unique booking ID or 'doctor'.
    * @param {object} res - Express response object.
    */
-  addClient(userId, res) {
+  addClient(doctorId, bookingId, res) {
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -22,14 +23,23 @@ class QueueSSEManager {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    this.clients.set(userId, res);
+    if (!this.clients.has(doctorId)) {
+      this.clients.set(doctorId, new Map());
+    }
+    this.clients.get(doctorId).set(bookingId, res);
 
     // Clean up on disconnect
     res.on('close', () => {
-      this.clients.delete(userId);
+      const docClients = this.clients.get(doctorId);
+      if (docClients) {
+        docClients.delete(bookingId);
+        if (docClients.size === 0) {
+          this.clients.delete(doctorId);
+        }
+      }
     });
 
-    console.log(`SSE Client connected: ${userId}. Total: ${this.clients.size}`);
+    console.log(`SSE Client connected: Doctor: ${doctorId}, Booking: ${bookingId}`);
   }
 
   /**
@@ -40,13 +50,11 @@ class QueueSSEManager {
     try {
       const queue = await client.zRange(`queue:${doctorId}`, 0, -1);
       
-      // In a real app, we might want to only send updates to patients in this specific queue.
-      // For now, we'll iterate through clients and send relevant data.
-      // A more optimized way would be to track which client is watching which doctor.
+      const docClients = this.clients.get(doctorId);
+      if (!docClients) return;
       
-      for (const [userId, res] of this.clients.entries()) {
-        // If the userId is a bookingId in the queue, calculate its position
-        const index = queue.findIndex(id => id === userId);
+      for (const [bookingId, res] of docClients.entries()) {
+        const index = queue.findIndex(id => id === bookingId);
         
         if (index !== -1) {
           const payload = {
@@ -56,12 +64,9 @@ class QueueSSEManager {
             done: false,
           };
           res.write(`data: ${JSON.stringify(payload)}\n\n`);
-        } else if (userId.startsWith('doctor:')) {
+        } else if (bookingId === 'doctor') {
           // If the client is a doctor, send them the full queue overview
-          const actualDoctorId = userId.replace('doctor:', '');
-          if (actualDoctorId === doctorId) {
-            res.write(`data: ${JSON.stringify({ total: queue.length, queue })}\n\n`);
-          }
+          res.write(`data: ${JSON.stringify({ total: queue.length, queue })}\n\n`);
         }
       }
     } catch (err) {
@@ -71,14 +76,18 @@ class QueueSSEManager {
 
   /**
    * Sends a completion event to a specific booking.
+   * @param {string} doctorId 
    * @param {string} bookingId 
    */
-  sendDone(bookingId) {
-    const res = this.clients.get(bookingId);
-    if (res) {
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
-      this.clients.delete(bookingId);
+  sendDone(doctorId, bookingId) {
+    const docClients = this.clients.get(doctorId);
+    if (docClients) {
+      const res = docClients.get(bookingId);
+      if (res) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+        docClients.delete(bookingId);
+      }
     }
   }
 }
