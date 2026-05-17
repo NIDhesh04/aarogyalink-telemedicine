@@ -2,6 +2,7 @@
 
 > **Project No. 11 · Health & Emergency · MERN Stack BTech**
 > **Group 7** · Team Lead: Suhani Agarwal · Members: Gursneh Kaur, Aryaman Bohra, Nidhesh Soni
+> 🔴 **Live Demo:** [aarogyalink-telemedicine.vercel.app](https://aarogyalink-telemedicine.vercel.app/)
 
 AarogyaLink is a comprehensive, bilingual (English/Hindi) telemedicine platform built specifically to bridge the healthcare gap in rural India. It connects rural patients and ASHA workers with specialized urban doctors through seamless video consultations, AI-powered symptom triage, and real-time smart queuing.
 
