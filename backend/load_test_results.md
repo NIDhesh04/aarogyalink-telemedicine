@@ -31,12 +31,12 @@ node tests/threadpool-benchmark.js
 
 | Metric | Result |
 |---|---|
-| Total Requests | 84,350 |
-| Requests / sec | 8,435 |
-| Avg Latency | 12 ms |
-| P99 Latency | 35 ms |
+| Total Requests | 19,452 |
+| Requests / sec | 1,945.3 |
+| Avg Latency | 102.34 ms |
+| P99 Latency | 396 ms |
 | Errors | 0 |
-| 2xx Responses | 84,350 |
+| 2xx Responses | 0 |
 
 **Expected:** Very high req/s and very low latency because Redis eliminates the MongoDB round-trip after the first cache warm-up.
 
@@ -50,10 +50,10 @@ node tests/threadpool-benchmark.js
 
 | Metric | Result |
 |---|---|
-| Total Requests | 11,240 |
-| Requests / sec | 1,124 |
-| Avg Latency | 87 ms |
-| P99 Latency | 215 ms |
+| Total Requests | 24,309 |
+| Requests / sec | 2,431.6 |
+| Avg Latency | 40.60 ms |
+| P99 Latency | 98 ms |
 | Errors | 0 |
 
 **Expected:** Lower req/s than Test 1, higher latency — demonstrates the value of the Redis cache-aside layer.
@@ -89,8 +89,8 @@ if (!slot) return res.status(400).json({ error: 'Slot already booked or not foun
 
 | Scenario | Mean EL Lag | Max EL Lag | Wall Time |
 |---|---|---|---|
-| **A — Blocking** (main thread PDF) | NaN ms (Fully Blocked) | 0.00 ms | 92 ms |
-| **B — Non-blocking** (worker_thread) | 14.64 ms | 16.28 ms | 316 ms |
+| **A — Blocking** (main thread PDF) | NaN ms (Fully Blocked) | 0.00 ms | 106 ms |
+| **B — Non-blocking** (worker_thread) | 13.96 ms | 16.11 ms | 321 ms |
 | **Improvement** | Eliminated blocking | — | — |
 
 **Architecture (how it works in production):**
