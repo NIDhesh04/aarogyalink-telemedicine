@@ -226,3 +226,16 @@
 .dark .notif-item-time {
   color: #64748b;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 640px) {
+  .notif-dropdown {
+    position: fixed;
+    top: 64px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: none;
+    z-index: 100;
+  }
+}
