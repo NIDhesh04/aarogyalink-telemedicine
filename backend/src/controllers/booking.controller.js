@@ -9,6 +9,8 @@ const { addPDFJob } = require('../services/queue/pdf.queue');
 const { sendBookingConfirmation } = require('../services/mail/mail.service');
 const { scheduleReminder } = require('../services/mail/reminder.service');
 const { isSlotInPast } = require('../utils/helpers');
+const Notification = require('../models/Notification');
+const { getIO } = require('../services/socket/socket.service');
 
 /**
  * POST /api/bookings
@@ -109,6 +111,31 @@ const createBooking = async (req, res) => {
   } catch (err) {
     console.error('Reminder scheduling failed:', err);
   }
+
+    // ── Real-Time Notifications ──
+    try {
+      const [savedPatientNotif, savedDoctorNotif] = await Notification.insertMany([
+        {
+          user: patientId,
+          message: `Your appointment has been booked for ${slot.date} at ${slot.startTime}.`,
+          type: 'booking_created',
+          link: '/patient',
+        },
+        {
+          user: slot.doctorId,
+          message: `New appointment booked by ${req.user.name} for ${slot.date} at ${slot.startTime}.`,
+          type: 'booking_created',
+          link: '/doctor',
+        },
+      ]);
+
+      // Push live via WebSocket (fire-and-forget — don't block the response)
+      const io = getIO();
+      io.to(patientId.toString()).emit('notification', savedPatientNotif);
+      io.to(slot.doctorId.toString()).emit('notification', savedDoctorNotif);
+    } catch (notifErr) {
+      console.error('Notification emit failed (non-fatal):', notifErr.message);
+    }
 
     res.status(201).json({ message: 'Booking successful', booking, queuePos: position });
   } catch (err) {

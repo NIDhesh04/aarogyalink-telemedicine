@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { Menu, X, LogOut, UserCircle, Stethoscope, Activity, ShieldCheck, LayoutDashboard, Cross, Settings, Sun, Moon, Languages } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 
 const ROLE_CONFIG = {
   patient:  { icon: UserCircle,  label: 'Patient',        color: 'text-sky-700 bg-sky-50 border-sky-200' },
@@ -113,6 +114,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
             {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{subtitle}</p>}
           </div>
           <div className="ml-auto flex items-center gap-2 sm:gap-4">
+            <NotificationBell />
             <button
               onClick={toggleLanguage}
               className="px-2 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"

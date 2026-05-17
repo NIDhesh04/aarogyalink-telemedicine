@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { SocketProvider } from './context/SocketContext'
 import Login from './pages/Login'
 import PatientDashboard from './pages/Patient/PatientDashboard'
 import DoctorDashboard from './pages/Doctor/DoctorDashboard'
@@ -43,7 +44,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppRoutes />
+        <SocketProvider>
+          <AppRoutes />
+        </SocketProvider>
       </AuthProvider>
     </ThemeProvider>
   )

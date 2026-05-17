@@ -2,6 +2,8 @@
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || 16;
 
 const app = require('./app');
+const http = require('http');
+const { initSocket } = require('./services/socket/socket.service');
 const { connectDB } = require('./config/db');       // Added this
 const { connectRedis } = require('./config/redis'); // Added this
 
@@ -20,7 +22,10 @@ const startServer = async () => {
         // Connect to Redis (Fixes your "Client is closed" error)[cite: 1]
         await connectRedis(); 
         
-        app.listen(PORT, () => {
+        const server = http.createServer(app);
+        initSocket(server);
+
+        server.listen(PORT, () => {
             console.log(`🚀 AarogyaLink Server running on port ${PORT}`);
         });
     } catch (error) {

@@ -1,0 +1,228 @@
+.notif-bell-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.notif-bell-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-bell-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Dark mode theme support */
+.dark .notif-bell-btn {
+  color: #94a3b8;
+}
+
+.dark .notif-bell-btn:hover {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+/* Red unread badge */
+.notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  border: 2px solid #ffffff;
+  animation: notif-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dark .notif-badge {
+  border-color: #0f172a;
+}
+
+@keyframes notif-pop {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
+/* Dropdown menu container */
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  z-index: 50;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: dropdown-fade 0.2s ease-out;
+}
+
+.dark .notif-dropdown {
+  background-color: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes dropdown-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.notif-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-b: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.dark .notif-dropdown-header {
+  border-bottom: 1px solid #334155;
+  background-color: #0f172a;
+}
+
+.notif-dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.dark .notif-dropdown-title {
+  color: #f8fafc;
+}
+
+.notif-mark-read {
+  background: transparent;
+  border: none;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.notif-mark-read:hover {
+  background-color: #f0f9ff;
+  text-decoration: underline;
+}
+
+.dark .notif-mark-read:hover {
+  background-color: #0c4a6e;
+}
+
+/* Notification item list */
+.notif-dropdown-list {
+  overflow-y: auto;
+  flex: 1;
+  max-height: 320px;
+}
+
+.notif-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dark .notif-empty {
+  color: #94a3b8;
+}
+
+.notif-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.notif-item:hover {
+  background-color: #f8fafc;
+}
+
+.dark .notif-item {
+  border-bottom: 1px solid #334155;
+}
+
+.dark .notif-item:hover {
+  background-color: #0f172a;
+}
+
+.notif-unread {
+  background-color: #f0f9ff;
+  border-left: 3px solid #0284c7;
+}
+
+.dark .notif-unread {
+  background-color: #0c4a6e;
+  border-left: 3px solid #0284c7;
+}
+
+.notif-item-msg {
+  font-size: 13px;
+  color: #334155;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.dark .notif-item-msg {
+  color: #cbd5e1;
+}
+
+.notif-unread .notif-item-msg {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.dark .notif-unread .notif-item-msg {
+  color: #ffffff;
+}
+
+.notif-item-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.dark .notif-item-time {
+  color: #64748b;
+}
