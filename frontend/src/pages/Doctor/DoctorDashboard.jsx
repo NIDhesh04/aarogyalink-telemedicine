@@ -244,13 +244,13 @@ export default function DoctorDashboard() {
             className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 max-w-lg transition-colors"
           >
             <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
-              <PlusCircle className="text-[#0284c7] dark:text-[#38bdf8]" size={24} /> Add Availability Slot
+              <PlusCircle className="text-[#0284c7] dark:text-[#38bdf8]" size={24} /> {t('Add Availability Slot')}
             </h3>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">Patients will be able to book these slots once you add them.</p>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">{t('Patients will be able to book these slots once you add them.')}</p>
 
             <form onSubmit={handleAddSlot} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Date</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{t('Date')}</label>
                 <input
                   type="date" required min={today}
                   value={newSlot.date} onChange={e => setNewSlot({ ...newSlot, date: e.target.value })}
@@ -258,12 +258,12 @@ export default function DoctorDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Time Slot</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{t('Time Slot')}</label>
                 <select
                   required value={newSlot.time} onChange={e => setNewSlot({ ...newSlot, time: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50 transition-all font-medium text-slate-700 dark:text-slate-200"
                 >
-                  <option value="">Select a time...</option>
+                  <option value="">{t('Select a time...')}</option>
                   {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -283,7 +283,7 @@ export default function DoctorDashboard() {
                 type="submit" disabled={adding}
                 className={`w-full mt-2 py-4 rounded-xl font-bold text-white shadow-md flex items-center justify-center transition-all ${adding ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-[#075985] hover:bg-[#0369a1]'}`}
               >
-                {adding ? 'Adding...' : 'Add Slot'}
+                {adding ? t('Adding...') : t('Add Slot')}
               </button>
             </form>
           </motion.div>
@@ -315,12 +315,12 @@ export default function DoctorDashboard() {
                 ) : sortedSlots.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 text-center px-4">
                     <Calendar size={32} className="text-slate-300 mb-3" />
-                    <p className="text-sm font-medium text-slate-500 mb-4">No slots scheduled on this date.</p>
+                    <p className="text-sm font-medium text-slate-500 mb-4">{t('No slots scheduled on this date.')}</p>
                     <button
                       className="px-4 py-2 bg-primary/10 text-[#0284c7] font-bold rounded-lg text-sm hover:bg-primary/20 transition-colors"
                       onClick={() => setTab('add')}
                     >
-                      + Add a Slot
+                      {t('+ Add a Slot')}
                     </button>
                   </div>
                 ) : (
@@ -342,7 +342,7 @@ export default function DoctorDashboard() {
                           </div>
                           <div>
                             <div className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-0.5">
-                              {slot.bookedBy?.name ?? (slot.isBooked ? 'Patient' : 'Open Slot')}
+                              {slot.bookedBy?.name ?? (slot.isBooked ? t('Patient') : t('Open Slot'))}
                             </div>
                             <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
                               {slot.time ?? slot.startTime}
@@ -350,7 +350,7 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
                         <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${s.bg} ${s.color}`}>
-                          {s.label}
+                          {t(s.label)}
                         </span>
                       </button>
                     )
@@ -375,7 +375,7 @@ export default function DoctorDashboard() {
                   <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100 dark:border-slate-800">
                     <div>
                       <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-1">
-                        {selected.bookedBy?.name ?? 'Open Slot'}
+                        {selected.bookedBy?.name ?? t('Open Slot')}
                       </h2>
                       <p className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                         <Clock size={14} /> {selected.time ?? selected.startTime}
@@ -386,7 +386,7 @@ export default function DoctorDashboard() {
                       const s = STATUS_MAP[sKey] || STATUS_MAP.pending
                       return (
                         <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${s.bg} ${s.color}`}>
-                          {s.label}
+                          {t(s.label)}
                         </span>
                       )
                     })()}

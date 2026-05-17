@@ -1,7 +1,57 @@
-# AarogyaLink — Rural Telemedicine Scheduler
+# 🏥 AarogyaLink — Rural Telemedicine Platform
 
 > **Project No. 11 · Health & Emergency · MERN Stack BTech**
-> Group 7 · Team Lead: Suhani Agarwal · Members: Gursneh Kaur, Aryaman Bohra, Nidhesh Soni
+> **Group 7** · Team Lead: Suhani Agarwal · Members: Gursneh Kaur, Aryaman Bohra, Nidhesh Soni
+> 🔴 **Live Demo:** [aarogyalink-telemedicine.vercel.app](https://aarogyalink-telemedicine.vercel.app/)
+
+AarogyaLink is a comprehensive, bilingual (English/Hindi) telemedicine platform built specifically to bridge the healthcare gap in rural India. It connects rural patients and ASHA workers with specialized urban doctors through seamless video consultations, AI-powered symptom triage, and real-time smart queuing.
+
+---
+
+## 📸 Platform Showcase
+
+### Patient Dashboard
+![Patient Dashboard](./frontend/public/screenshots/patient.png)
+
+### Doctor Dashboard
+![Doctor Dashboard](./frontend/public/screenshots/doctor.png)
+
+### Admin Dashboard
+![Admin Dashboard](./frontend/public/screenshots/admin.png)
+
+---
+
+## ✨ Key Features
+
+- **🌐 Bilingual UI (i18n):** Full Hindi & English support across all dashboards for rural accessibility.
+- **🤖 AI Symptom Triage:** Integrates Claude AI to parse raw patient symptoms into structured, professional clinical briefs for doctors before the consultation begins.
+- **⚡ Real-time Smart Queue:** Uses Server-Sent Events (SSE) to broadcast live queue position updates to waiting patients so they know exactly when it is their turn.
+- **🎥 Integrated Video Calls:** Seamless telemedicine video consultations.
+- **📄 Background PDF Generation:** Uses BullMQ and native Node.js Worker Threads (`worker_threads`) to generate downloadable PDF prescriptions without blocking the main event loop.
+- **🔒 Role-Based Access Control (RBAC):** Secure 4-tier architecture isolating functionality for Patients, Doctors, ASHA Workers, and Admins.
+- **📈 High Performance Caching:** A Redis cache-aside layer ensures lightning-fast slot loading and protects the MongoDB database from heavy read traffic.
+
+---
+
+## 🛠️ Tech Stack
+
+**Frontend (Client)**
+- **Framework:** React 18 (Vite)
+- **Styling:** Tailwind CSS, Framer Motion (Animations)
+- **Routing & State:** React Router DOM, React Context API
+- **Localization:** i18next, react-i18next
+
+**Backend (API Server)**
+- **Runtime:** Node.js, Express.js
+- **Architecture:** MVC (Model-View-Controller)
+- **Auth:** JWT (Short-lived Access + HTTP-Only Refresh Tokens)
+- **Concurrency:** Server-Sent Events (SSE), Worker Threads
+
+**Database & Infrastructure**
+- **Primary DB:** MongoDB (Mongoose)
+- **Cache & Message Broker:** Redis (ioredis)
+- **Job Queue:** BullMQ
+- **Containerization:** Docker & Docker Compose
 
 ---
 
@@ -96,45 +146,6 @@ VITE_API_BASE_URL=http://localhost:5005/api
 
 ---
 
-## 📁 Project Structure
-
-```
-aarogyalink-telemedicine/
-├── backend/
-│   ├── src/
-│   │   ├── config/          # db.js, redis.js, env.js
-│   │   ├── models/          # User, Doctor, Slot, Booking, AuditLog
-│   │   ├── controllers/     # booking, prescription, user
-│   │   ├── routes/          # auth, slot, booking, user, admin, sse, prescription
-│   │   ├── middleware/      # auth.js (JWT), rbac.js (RBAC), errorHandler.js
-│   │   ├── services/
-│   │   │   ├── ai/          # Claude triage.service.js
-│   │   │   ├── mail/        # mail.service.js, reminder.service.js
-│   │   │   ├── pdf/         # pdf generator (pdfkit)
-│   │   │   ├── queue/       # BullMQ pdf.queue.js
-│   │   │   └── sse/         # queue.sse.js (SSE manager)
-│   │   ├── workers/         # pdf.worker.js, pdf.thread.js, pdf.processor.js
-│   │   └── scripts/         # seed.js
-│   ├── tests/               # e2e.test.js, load_test.js, eventloop_lag.js, threadpool-benchmark.js
-│   ├── architecture_notes.md
-│   ├── load_test_results.md
-│   └── threadpool_results.md
-├── frontend/
-│   └── src/
-│       ├── api/             # axiosInstance.js (silent JWT refresh)
-│       ├── components/      # DashboardLayout, Navbar
-│       ├── context/         # AuthContext.jsx
-│       ├── hooks/           # useAuth.js, useQueuePosition.js
-│       └── pages/
-│           ├── Patient/     # PatientDashboard.jsx
-│           ├── Doctor/      # DoctorDashboard.jsx
-│           ├── ASHA/        # ASHADashboard.jsx
-│           └── Admin/       # AdminDashboard.jsx
-└── docker-compose.yml
-```
-
----
-
 ## 🧱 Architecture Overview
 
 ```
@@ -172,8 +183,7 @@ Express API (Node.js — port 5005)
 | **JWT + refresh token** | `auth.routes.js`, `middleware/auth.js` |
 | **4-role RBAC** | `middleware/rbac.js` → `checkRole([...])` |
 | **Axios silent refresh** | `frontend/src/api/axiosInstance.js` |
-| **useMemo** | `PatientDashboard.jsx`, `DoctorDashboard.jsx`, `AdminDashboard.jsx` |
-| **useCallback** | `PatientDashboard.jsx`, `DoctorDashboard.jsx`, `ASHADashboard.jsx`, `AdminDashboard.jsx` |
+| **useMemo / useCallback** | Heavily utilized across all React Dashboards for performance optimization |
 | **SSE (server-sent events)** | `sse.routes.js`, `services/sse/queue.sse.js` |
 | **Worker thread (libuv)** | `workers/pdf.worker.js` + `workers/pdf.thread.js` |
 | **BullMQ job queue** | `services/queue/pdf.queue.js` + `workers/pdf.worker.js` |
@@ -237,4 +247,6 @@ See [`backend/threadpool_results.md`](backend/threadpool_results.md) for threadp
 
 ---
 
-*AarogyaLink — Built for the last mile of India's rural health system.*
+<p align="center">
+  <i>AarogyaLink — Built for the last mile of India's rural health system.</i>
+</p>

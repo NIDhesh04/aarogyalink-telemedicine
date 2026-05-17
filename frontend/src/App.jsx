@@ -7,6 +7,7 @@ import DoctorDashboard from './pages/Doctor/DoctorDashboard'
 import ASHADashboard from './pages/ASHA/ASHADashboard'
 import AdminDashboard from './pages/Admin/AdminDashboard'
 import ProfileSettings from './pages/Profile/ProfileSettings'
+import NotFound from './pages/NotFound'
 
 function ProtectedRoute({ role, children }) {
   const { user } = useAuth()
@@ -32,6 +33,7 @@ function AppRoutes() {
         <Route path="/asha"    element={<ProtectedRoute role="asha"><ASHADashboard /></ProtectedRoute>} />
         <Route path="/admin"   element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<RequireAuth><ProfileSettings /></RequireAuth>} />
+        <Route path="*"        element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )

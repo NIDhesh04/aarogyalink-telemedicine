@@ -138,9 +138,9 @@ export default function PatientDashboard() {
   }
 
   const STATUS_CONFIG = {
-    booked:    { label: 'Scheduled', class: 'bg-sky-50 text-sky-700 border-sky-200' },
-    completed: { label: 'Completed', class: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    cancelled: { label: 'Cancelled', class: 'bg-red-50 text-red-700 border-red-200' },
+    booked:    { label: t('Scheduled'), class: 'bg-sky-50 text-sky-700 border-sky-200' },
+    completed: { label: t('Completed'), class: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    cancelled: { label: t('Cancelled'), class: 'bg-red-50 text-red-700 border-red-200' },
   }
 
   return (
@@ -244,14 +244,14 @@ export default function PatientDashboard() {
                     <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 rounded-full flex items-center justify-center mb-5">
                       <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Appointment Confirmed</h3>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{t('Appointment Confirmed')}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                       {selectedSlot?.doctorId?.name ?? 'Doctor'} &bull; {selectedSlot?.time}
                     </p>
 
                     {bookedData?.booking && (
                       <div className="w-full bg-sky-50 dark:bg-[#075985]/10 border border-sky-200 dark:border-[#075985]/30 rounded-xl p-5 mb-6 text-center">
-                        <p className="text-xs font-semibold text-sky-600 dark:text-[#38bdf8] uppercase tracking-wider mb-2">Live Queue Position</p>
+                        <p className="text-xs font-semibold text-sky-600 dark:text-[#38bdf8] uppercase tracking-wider mb-2">{t('Live Queue Position')}</p>
                         <p className="text-4xl font-bold text-[#075985] mb-2">
                           #{queueInfo.connected && queueInfo.position ? queueInfo.position : (bookedData.queuePos ?? '—')}
                         </p>
@@ -272,14 +272,14 @@ export default function PatientDashboard() {
                           rel="noopener noreferrer"
                           className="px-5 py-2.5 rounded-lg border border-blue-200 dark:border-blue-900/50 text-sm font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-2"
                         >
-                          🎥 Join Video Call
+                          {t('🎥 Join Video Call')}
                         </a>
                       )}
                       <button
                         onClick={handleReset}
                         className="px-5 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                       >
-                        Book Another Consultation
+                        {t('Book Another Consultation')}
                       </button>
                     </div>
                   </motion.div>
@@ -340,9 +340,9 @@ export default function PatientDashboard() {
             className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <Clock size={16} className="text-slate-400" /> Appointment History
+                <Clock size={16} className="text-slate-400" /> {t('Appointment History')}
               </h2>
-              <span className="text-xs text-slate-400 font-medium">{bookings.length} record{bookings.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-slate-400 font-medium">{bookings.length} {bookings.length !== 1 ? t('records') : t('record')}</span>
             </div>
 
             {bookings.length === 0 ? (
@@ -373,24 +373,24 @@ export default function PatientDashboard() {
                         {b.prescriptionUrl && (
                           <a href={`${(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5005/api').replace(/\/api$/, '')}${b.prescriptionUrl}`} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
-                            <Download size={13} /> Download Prescription
+                            <Download size={13} /> {t('Download Prescription')}
                           </a>
                         )}
                         {b.videoLink && b.status === 'booked' && (
                           <a href={b.videoLink} target="_blank" rel="noopener noreferrer"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
-                            🎥 Join Video Call
+                            {t('🎥 Join Video Call')}
                           </a>
                         )}
                         {b.status === 'completed' && (
                           <button onClick={() => setReviewBooking(b)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
-                            <Star size={13} /> Rate Doctor
+                            <Star size={13} /> {t('Rate Doctor')}
                           </button>
                         )}
                         {b.status === 'booked' && b.queuePosition !== undefined && (
                           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/50">
-                            <Hash size={11} /> Pos: #{b.queuePosition}
+                            <Hash size={11} /> {t('Pos:')} #{b.queuePosition}
                           </span>
                         )}
                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border ${sc.class}`}>{sc.label}</span>
