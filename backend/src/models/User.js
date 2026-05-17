@@ -29,6 +29,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true 
   },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected'],
+    default: 'active'
+  }
 }, { timestamps: true });
 
 // Hash password before saving

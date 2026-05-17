@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useAuth } from '../../context/AuthContext'
 import axiosInstance from '../../api/axiosInstance'
-import { Users, CalendarCheck, CheckSquare, TrendingUp, Stethoscope, ClipboardList, Shield, Activity, Search } from 'lucide-react'
+import { Users, CalendarCheck, CheckSquare, TrendingUp, Stethoscope, ClipboardList, Shield, Activity, Search, X, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { hi } from 'date-fns/locale/hi'
 import { enUS } from 'date-fns/locale/en-US'
@@ -41,12 +41,41 @@ export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState(EMPTY_ANALYTICS)
   const [totalWeekly, setTotalWeekly] = useState(0)
   const [auditLogs, setAuditLogs] = useState([])
+  const [pendingUsers, setPendingUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const { t, i18n } = useTranslation()
   
   // Search states for filtering
   const [doctorSearch, setDoctorSearch] = useState('')
   const [auditSearch, setAuditSearch] = useState('')
+
+  // Slot Management Modal States
+  const [selectedDoctorForSlots, setSelectedDoctorForSlots] = useState(null)
+  const [slotDate, setSlotDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [doctorSlots, setDoctorSlots] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+
+  // Fetch slots when doctor or date changes
+  useEffect(() => {
+    if (!selectedDoctorForSlots) return;
+    setLoadingSlots(true);
+    // Doctor model populates userId. The slot doctorId is the User ID.
+    const docId = selectedDoctorForSlots.userId?._id || selectedDoctorForSlots._id;
+    axiosInstance.get(`/slots/doctor/${docId}?date=${slotDate}`)
+      .then(r => setDoctorSlots(r.data))
+      .catch(console.error)
+      .finally(() => setLoadingSlots(false))
+  }, [selectedDoctorForSlots, slotDate])
+
+  const handleDeactivateSlot = async (slotId) => {
+    if (!window.confirm('Are you sure you want to deactivate this slot?')) return;
+    try {
+      await axiosInstance.patch(`/slots/${slotId}/deactivate`);
+      setDoctorSlots(prev => prev.filter(s => s._id !== slotId));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to deactivate slot');
+    }
+  }
 
   // useCallback: stable fetch function — won't re-create on every render
   // Teacher checklist: "useCallback: event handlers and fetch handlers"
@@ -59,7 +88,8 @@ export default function AdminDashboard() {
       axiosInstance.get('/admin/analytics').then(r => {
         setAnalytics(r.data.weeklyBookings.map(d => ({ day: d.day, bookings: d.count })))
         setTotalWeekly(r.data.total)
-      })
+      }),
+      axiosInstance.get('/admin/pending-users').then(r => setPendingUsers(r.data))
     ]).catch(console.error).finally(() => setLoading(false))
   }, [])   // no deps — only needs to be created once
 
@@ -90,6 +120,19 @@ export default function AdminDashboard() {
     })
   }, [auditLogs, auditSearch])
 
+  const handleUserStatus = async (id, status) => {
+    if (!window.confirm(`Are you sure you want to ${status} this user?`)) return;
+    try {
+      await axiosInstance.put(`/admin/users/${id}/status`, { status });
+      setPendingUsers(prev => prev.filter(u => u._id !== id));
+      if (status === 'active') {
+        fetchAll(); // Refresh stats and lists
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || `Failed to ${status} user`);
+    }
+  }
+
   const statCards = [
     { icon: Users, label: t('Total Doctors'), value: stats.totalDoctors, color: 'text-violet-700 bg-violet-50 border-violet-100' },
     { icon: CalendarCheck, label: t('All-Time Bookings'), value: stats.totalBookings, color: 'text-sky-700 bg-sky-50 border-sky-100' },
@@ -117,6 +160,47 @@ export default function AdminDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Pending Approvals */}
+      {pendingUsers.length > 0 && (
+        <div className="mb-8 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-amber-200 dark:border-amber-800 bg-amber-100/50 dark:bg-amber-900/40">
+            <h2 className="text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <Shield size={16} /> {t('Pending Approvals')} ({pendingUsers.length})
+            </h2>
+          </div>
+          <div className="divide-y divide-amber-200/50 dark:divide-amber-800/50">
+            {pendingUsers.map(u => (
+              <div key={u._id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{u.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-amber-200/50 text-amber-800 dark:bg-amber-800/50 dark:text-amber-200">{u.role}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>{u.email}</span>
+                    {u.phone && <span>{u.phone}</span>}
+                    {u.specialty && <span className="font-semibold text-violet-600 dark:text-violet-400">Spec: {u.specialty}</span>}
+                  </div>
+                  {u.certificateUrl && (
+                    <a href={`http://localhost:5000${u.certificateUrl}`} target="_blank" rel="noreferrer" className="text-xs text-sky-600 hover:underline mt-2 inline-block font-semibold">
+                      View Certificate
+                    </a>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => handleUserStatus(u._id, 'active')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm transition-colors">
+                    Approve
+                  </button>
+                  <button onClick={() => handleUserStatus(u._id, 'rejected')} className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded transition-colors dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400">
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Doctor Roster */}
@@ -151,7 +235,7 @@ export default function AdminDashboard() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                    {['Name', 'Specialty', 'Status'].map(h => (
+                    {['Name', 'Specialty', 'Status', 'Actions'].map(h => (
                       <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t(h)}</th>
                     ))}
                   </tr>
@@ -177,6 +261,14 @@ export default function AdminDashboard() {
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           {t('Active')}
                         </span>
+                      </td>
+                      <td className="px-6 py-3.5 text-right">
+                        <button
+                          onClick={() => setSelectedDoctorForSlots(d)}
+                          className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                        >
+                          {t('Manage Slots')}
+                        </button>
                       </td>
                     </motion.tr>
                   ))}
@@ -267,6 +359,76 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Modal for Managing Slots */}
+      <AnimatePresence>
+        {selectedDoctorForSlots && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">
+                  {t('Manage Slots')}: Dr. {selectedDoctorForSlots.userId?.name?.replace('Dr. ', '') || selectedDoctorForSlots.name}
+                </h3>
+                <button onClick={() => setSelectedDoctorForSlots(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('Select Date')}</label>
+                  <input
+                    type="date" value={slotDate} onChange={e => setSlotDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#0284c7]/50"
+                  />
+                </div>
+                {loadingSlots ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-[#0284c7] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : doctorSlots.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm font-medium text-slate-500">{t('No slots scheduled for this date.')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {doctorSlots.map(slot => (
+                      <div key={slot._id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600">
+                            <Clock size={14} className="text-slate-500 dark:text-slate-400" />
+                          </div>
+                          <div>
+                            <span className="block text-sm font-bold text-slate-700 dark:text-slate-200">{slot.time ?? slot.startTime}</span>
+                            {slot.isBooked ? (
+                              <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">{t('Booked')}</span>
+                            ) : (
+                              <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">{t('Open')}</span>
+                            )}
+                          </div>
+                        </div>
+                        {!slot.isBooked && (
+                          <button
+                            onClick={() => handleDeactivateSlot(slot._id)}
+                            className="text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/50"
+                          >
+                            {t('Deactivate')}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   )
 }
